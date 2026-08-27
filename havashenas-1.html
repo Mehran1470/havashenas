@@ -16,7 +16,8 @@ body{font-family:'Vazirmatn',Tahoma,sans-serif;background:var(--bg-deep);color:v
 
 header{padding:28px 0 16px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;animation:fadeInDown .8s ease-out}
 .logo-wrap{display:flex;align-items:center;gap:14px}
-.logo-icon{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--accent),#00f2fe);display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 20px rgba(79,172,254,.35)}
+.logo-icon{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,rgba(79,172,254,.35),rgba(0,242,254,.18));display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 4px 20px rgba(79,172,254,.22)}
+.logo-icon img{width:100%;height:100%;object-fit:cover;display:block}
 .logo-text{font-size:26px;font-weight:900;letter-spacing:-.5px}
 .logo-sub{font-size:13px;color:var(--text-dim);margin-top:2px;font-weight:400}
 
@@ -175,7 +176,7 @@ footer{text-align:center;padding:40px 0 20px;color:rgba(255,255,255,.35);font-si
 <div class="container">
 <header>
   <div class="logo-wrap">
-    <div class="logo-icon">🌤️</div>
+    <div class="logo-icon"><img src="weather-logo.png" alt="لوگوی هواشناسی هرمزگان"></div>
     <div>
       <div class="logo-text">هواشناسی هرمزگان</div>
       <div class="logo-sub">پیش‌بینی لحظه‌ای و دقیق</div>
@@ -244,19 +245,19 @@ footer{text-align:center;padding:40px 0 20px;color:rgba(255,255,255,.35);font-si
         <div class="tide-gauge-wave"></div>
       </div>
       <div class="tide-gauge-labels">
-        <span class="low">مد پایین</span>
-        <span class="high">مد بالا</span>
+        <span class="low">جزر</span>
+        <span class="high">مد</span>
       </div>
     </div>
 
     <div class="tide-next" id="tideNextCards">
       <div class="tide-next-item">
-        <div class="tide-type">مد بالای بعدی</div>
+        <div class="tide-type">مد بعدی</div>
         <div class="tide-time" id="nextHighTime">—</div>
         <div class="tide-height" id="nextHighHeight">—</div>
       </div>
       <div class="tide-next-item">
-        <div class="tide-type">مد پایین بعدی</div>
+        <div class="tide-type">جزر بعدی</div>
         <div class="tide-time" id="nextLowTime">—</div>
         <div class="tide-height" id="nextLowHeight">—</div>
       </div>
@@ -527,105 +528,91 @@ function moonPhase(date){
   return{age:age.toFixed(1),percent:Math.round((1-Math.cos(p*Math.PI*2))/2*100),name:name,phase:p};
 }
 
-function calculateTides(date,lat,lon,cityOffset){
-  // Harmonic tide approximation for Persian Gulf / Oman Sea
-  const base=new Date(date);base.setHours(0,0,0,0);
-  const now=new Date();
-  
-  // Lunar synodic period
-  const synodic=29.53058867;
-  const lunarDay=24.84; // hours
-  
-  // Reference new moon: Jan 6, 2000
-  const refNewMoon=new Date(2000,0,6,18,14,0);
-  const daysSinceRef=(base.getTime()-refNewMoon.getTime())/(1000*60*60*24);
-  const lunarAge=daysSinceRef%synodic;
-  const moonPhaseVal=lunarAge/synodic; // 0-1
-  
-  // Base tide time offset based on longitude (local solar time)
-  const lonOffset=(lon-52.5)*4; // minutes from Tehran
-  
-  // Semi-diurnal tide (M2 + S2 components simplified)
-  // Two high tides and two low tides per lunar day (~12.42h apart)
-  const M2period=12.4206; // hours
-  const S2period=12.0; // hours
-  
-  // First high tide after midnight, adjusted for moon phase
-  // Spring tide near full/new moon (0, 0.5), neap near quarters (0.25, 0.75)
-  const springOffset=Math.cos(moonPhaseVal*Math.PI*2); // 1=spring, -1=neap
-  const baseHighTime=3.5+springOffset*0.5; // hours after midnight
-  
-  const tides=[];
-  const tideRange={min:0.8,max:3.2}; // meters approx for Hormozgan
-  
-  // Generate 4 tide events for the date
-  for(let i=0;i<8;i++){
-    const type=i%2===0?'high':'low';
-    const cycleOffset=i*M2period/2;
-    const t=new Date(base.getTime());
-    t.setHours(0,0,0,0);
-    t.setMinutes((baseHighTime+cycleOffset)*60+lonOffset+cityOffset);
-    
-    // Height calculation
-    let height;
-    if(type==='high'){
-      const range=tideRange.max-tideRange.min;
-      height=tideRange.min+range*(0.5+0.5*springOffset*0.8);
-    }else{
-      const range=tideRange.max-tideRange.min;
-      height=tideRange.min+range*(0.1+0.1*springOffset*0.8);
-    }
-    
-    // Add some variation based on latitude
-    height*=1+(lat-27)*0.02;
-    
-    if(t.getDate()===date.getDate()||t.getDate()===(date.getDate()+1)%31){
-      tides.push({
-        time:t,
-        type:type,
-        label:type==='high'?'مد بالا':'مد پایین',
-        height:Math.max(0.3,height).toFixed(1)
-      });
-    }
-  }
-  
-  // Sort by time
-  tides.sort((a,b)=>a.time-b.time);
-  
-  // Find current state
-  let currentState='';
-  let currentPercent=50;
-  let nextHigh=null,nextLow=null;
-  
-  for(let i=0;i<tides.length;i++){
-    const t=tides[i];
-    if(t.time>now){
-      if(t.type==='high'&&!nextHigh)nextHigh=t;
-      if(t.type==='low'&&!nextLow)nextLow=t;
-    }
-    if(i<tides.length-1){
-      const prev=tides[i];
-      const next=tides[i+1];
-      if(now>=prev.time&&now<next.time){
-        const duration=next.time-prev.time;
-        const elapsed=now-prev.time;
-        currentPercent=prev.type==='high'?(1-elapsed/duration)*100:(elapsed/duration)*100;
-        currentState=prev.type==='high'?'در حال جزر (کاهش)':'در حال مد (افزایش)';
-      }
-    }
-  }
-  
-  // If before first tide of day
-  if(!currentState&&tides.length>0){
-    if(now<tides[0].time){
-      currentState=tides[0].type==='high'?'در حال مد (افزایش)':'در حال جزر (کاهش)';
-      currentPercent=tides[0].type==='high'?75:25;
-    }
-  }
-  
-  return{tides,currentState,currentPercent,nextHigh,nextLow,moonPhase:springOffset};
+async function fetchTidesAt(lat,lon){
+  const api=`https://marine-api.open-meteo.com/v1/marine?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&hourly=sea_level_height_msl&past_hours=48&forecast_days=4&timezone=auto&cell_selection=sea`;
+  const res=await fetch(api,{cache:'no-store'});
+  if(!res.ok)return null;
+  const data=await res.json();
+  const times=data.hourly?.time||[];
+  const heights=data.hourly?.sea_level_height_msl||[];
+  if(times.length<5||heights.length!==times.length)return null;
+  const points=times.map((iso,i)=>({time:new Date(iso),height:heights[i]==null?NaN:Number(heights[i])})).filter(x=>Number.isFinite(x.height));
+  if(points.length<10)return null;
+  return points;
 }
 
+// Bandar Abbas/Hormuz strait sits on a narrow, complex coastline where the marine
+// model's ~8km grid can miss usable sea data right at the shore. If the first try
+// comes back empty we nudge the coordinate a bit toward open water and retry.
+async function fetchTidesRobust(lat,lon){
+  const offsets=[[0,0],[0.15,0.15],[-0.15,0.15],[0.15,-0.15],[-0.15,-0.15],[0.3,0],[0,0.3],[-0.3,0]];
+  for(const [dLat,dLon] of offsets){
+    const pts=await fetchTidesAt(lat+dLat,lon+dLon);
+    if(pts)return pts;
+  }
+  return null;
+}
+
+let tideCoordCache={};
+async function fetchTides(date,lat,lon){
+  const key=lat+','+lon;
+  let points=tideCoordCache[key];
+  if(!points){
+    points=await fetchTidesRobust(lat,lon);
+    if(!points)throw new Error('Tide data unavailable');
+    tideCoordCache[key]=points;
+  }
+
+  const events=[];
+  for(let i=1;i<points.length-1;i++){
+    const a=points[i-1],b=points[i],c=points[i+1];
+    if(b.height>a.height&&b.height>=c.height){events.push({time:b.time,type:'high',label:'مد',height:b.height.toFixed(2)});}
+    else if(b.height<a.height&&b.height<=c.height){events.push({time:b.time,type:'low',label:'جزر',height:b.height.toFixed(2)});}
+  }
+  events.sort((a,b)=>a.time-b.time);
+
+  const now=new Date();
+  const targetStart=new Date(date);targetStart.setHours(0,0,0,0);
+  const targetEnd=new Date(targetStart);targetEnd.setDate(targetEnd.getDate()+1);
+  const dayEvents=events.filter(e=>e.time>=targetStart&&e.time<targetEnd);
+
+  let currentState='';
+  let currentPercent=50;
+  let prev=null,next=null;
+  for(let i=0;i<events.length;i++){
+    if(events[i].time<=now)prev=events[i];
+    if(events[i].time>now){next=events[i];break;}
+  }
+  if(prev&&next){
+    const total=next.time-prev.time;
+    const elapsed=now-prev.time;
+    const ratio=Math.max(0,Math.min(1,elapsed/total));
+    currentPercent=prev.type==='high'?(1-ratio)*100:ratio*100;
+    currentState=prev.type==='high'?'در حال جزر (کاهش)':'در حال مد (افزایش)';
+  }else if(next){
+    currentState=next.type==='high'?'در حال مد (افزایش)':'در حال جزر (کاهش)';
+    currentPercent=50;
+  }else{
+    // No clear peak/trough found nearby (sparse data) — fall back to a simple
+    // min/max read of the surrounding window so the gauge still shows something real.
+    const windowPts=points.filter(p=>Math.abs(p.time-now)<12*3600*1000);
+    if(windowPts.length>=3){
+      const hs=windowPts.map(p=>p.height);
+      const mn=Math.min(...hs),mx=Math.max(...hs);
+      const cur=windowPts.reduce((a,b)=>Math.abs(a.time-now)<Math.abs(b.time-now)?a:b).height;
+      currentPercent=mx>mn?((cur-mn)/(mx-mn))*100:50;
+      currentState='وضعیت تقریبی';
+    }
+  }
+
+  const nextHigh=events.find(e=>e.time>now&&e.type==='high')||null;
+  const nextLow=events.find(e=>e.time>now&&e.type==='low')||null;
+  return {tides:dayEvents,currentState,currentPercent,nextHigh,nextLow,allEvents:events,source:'Open-Meteo Marine'};
+}
+
+async function calculateTides(date,lat,lon){
+  return fetchTides(date,lat,lon);
+}
 const citySelect=document.getElementById("citySelect");
 const statusBar=document.getElementById("statusBar"),statusText=document.getElementById("statusText");
 function setStatus(msg,err){statusText.textContent=msg;if(err)statusBar.classList.add("error");else statusBar.classList.remove("error");}
@@ -652,13 +639,7 @@ function showDayDetail(idx){
   const mp=moonPhase(dayDate);
   const city=citySelect.value;
   const c=cities[city];
-  const tides=calculateTides(dayDate,c.lat,c.lon,c.tideOffset);
-
   document.getElementById('detailTitle').textContent=names[idx]+' • '+dayName(d.time[idx]);
-
-  let tideHtml='—';
-  if(tides.tides.length){tideHtml=tides.tides.map(t=>`<div style="font-size:11px;margin-top:2px">${t.label}: ${timeFa(t.time.toISOString())} (${t.height}m)</div>`).join('');}
-
   const items=[
     {icon:'🌡️',label:'بیشینه دما',val:Math.round(d.temperature_2m_max[idx])+'°'},
     {icon:'❄️',label:'کمینه دما',val:Math.round(d.temperature_2m_min[idx])+'°'},
@@ -669,106 +650,67 @@ function showDayDetail(idx){
     {icon:'🌇',label:'غروب',val:timeFa(d.sunset[idx])},
     {icon:'🌙',label:'ماه ('+mp.name+')',val:mp.percent+'%'}
   ];
-  if(tides.tides.length) items.push({icon:'🌊',label:'جزر و مد',val:tideHtml});
-
   document.getElementById('detailGrid').innerHTML=items.map(it=>`<div class="detail-item"><span>${it.icon} ${it.label}</span><b>${it.val}</b></div>`).join('');
   document.getElementById('dayDetail').classList.add('show');
   document.querySelectorAll('.day-card').forEach((c,i)=>c.classList.toggle('active',i===idx));
   selectedDayIndex=idx;
+  calculateTides(dayDate,c.lat,c.lon).then(tides=>{
+    if(!tides.tides.length)return;
+    const tideHtml=tides.tides.map(t=>`<div style="font-size:11px;margin-top:2px">${t.label}: ${timeFa(t.time.toISOString())} (${t.height}m)</div>`).join('');
+    items.push({icon:'🌊',label:'جزر و مد',val:tideHtml});
+    document.getElementById('detailGrid').innerHTML=items.map(it=>`<div class="detail-item"><span>${it.icon} ${it.label}</span><b>${it.val}</b></div>`).join('');
+  }).catch(()=>{});
 }
-
-function renderTideSection(){
+async function renderTideSection(){
   const city=citySelect.value;
   const c=cities[city];
   if(!c)return;
-  
   const now=new Date();
-  const today=calculateTides(now,c.lat,c.lon,c.tideOffset);
+  const today=await calculateTides(now,c.lat,c.lon);
   const tomorrow=new Date(now);tomorrow.setDate(tomorrow.getDate()+1);
-  const tmrTides=calculateTides(tomorrow,c.lat,c.lon,c.tideOffset);
-  
+  const tmrTides=await calculateTides(tomorrow,c.lat,c.lon);
   lastTideData={today,tmrTides};
-  
-  // Show section
+
   document.getElementById('tideSection').style.display='block';
   document.getElementById('tideCityLabel').textContent=city;
-  
-  // Current state
+
   const stateEl=document.getElementById('tideStateText');
   const arrowEl=document.getElementById('tideArrow');
   const gaugeEl=document.getElementById('tideGaugeFill');
-  
   if(today.currentState){
     stateEl.textContent=today.currentState;
     arrowEl.textContent=today.currentState.includes('مد')?'↗️':'↘️';
     gaugeEl.style.height=Math.max(10,Math.min(90,today.currentPercent))+'%';
   }else{
-    stateEl.textContent='اطلاعات نامشخص';
-    arrowEl.textContent='➡️';
-    gaugeEl.style.height='50%';
+    stateEl.textContent='اطلاعات نامشخص';arrowEl.textContent='➡️';gaugeEl.style.height='50%';
   }
-  
-  document.getElementById('tideCurrentTime').textContent='به وقت محلی';
-  
-  // Next tides
+  document.getElementById('tideCurrentTime').textContent='پیش‌بینی مدل دریایی • به وقت محلی';
+
   if(today.nextHigh){
     document.getElementById('nextHighTime').textContent=timeFa(today.nextHigh.time.toISOString());
     document.getElementById('nextHighHeight').textContent='ارتفاع: '+today.nextHigh.height+' متر';
-  }else{
-    document.getElementById('nextHighTime').textContent='—';
-    document.getElementById('nextHighHeight').textContent='—';
-  }
-  
+  }else{document.getElementById('nextHighTime').textContent='—';document.getElementById('nextHighHeight').textContent='—';}
   if(today.nextLow){
     document.getElementById('nextLowTime').textContent=timeFa(today.nextLow.time.toISOString());
     document.getElementById('nextLowHeight').textContent='ارتفاع: '+today.nextLow.height+' متر';
-  }else{
-    document.getElementById('nextLowTime').textContent='—';
-    document.getElementById('nextLowHeight').textContent='—';
-  }
-  
-  // Next tide in hero stats
-  const nextTide=today.nextHigh||today.nextLow;
+  }else{document.getElementById('nextLowTime').textContent='—';document.getElementById('nextLowHeight').textContent='—';}
+
+  const nextTide=[today.nextHigh,today.nextLow].filter(Boolean).sort((a,b)=>a.time-b.time)[0];
   if(nextTide){
-    const diff=Math.ceil((nextTide.time-now)/(1000*60));
-    const diffH=Math.floor(diff/60);
-    const diffM=diff%60;
-    let timeStr='';
-    if(diffH>0)timeStr+=diffH+' ساعت ';
-    if(diffM>0)timeStr+=diffM+' دقیقه';
-    document.getElementById('tideNext').textContent=timeStr;
+    const diff=Math.max(0,Math.ceil((nextTide.time-now)/(1000*60)));
+    const diffH=Math.floor(diff/60),diffM=diff%60;
+    let timeStr='';if(diffH>0)timeStr+=diffH+' ساعت ';if(diffM>0)timeStr+=diffM+' دقیقه';
+    document.getElementById('tideNext').textContent=timeStr||'کمتر از یک دقیقه';
   }
-  
-  // Table
-  const allTides=[...today.tides,...tmrTides.tides].filter(t=>{
-    const diff=(t.time-now)/(1000*60*60);
-    return diff>-2&&diff<48;
-  }).slice(0,8);
-  
-  let tableHTML=`
-    <div class="tide-table-row tide-table-header">
-      <div>تاریخ</div>
-      <div>نوع</div>
-      <div>زمان</div>
-      <div>ارتفاع</div>
-    </div>
-  `;
-  
+
+  const allTides=[...today.tides,...tmrTides.tides].filter(t=>t.time>new Date(now.getTime()-2*60*60*1000)&&t.time<new Date(now.getTime()+48*60*60*1000)).sort((a,b)=>a.time-b.time).slice(0,8);
+  let tableHTML=`<div class="tide-table-row tide-table-header"><div>تاریخ</div><div>نوع</div><div>زمان</div><div>ارتفاع</div></div>`;
   allTides.forEach(t=>{
-    const isToday=t.time.getDate()===now.getDate();
-    tableHTML+=`
-      <div class="tide-table-row">
-        <div>${isToday?'امروز':'فردا'}</div>
-        <div><span class="tide-badge ${t.type}">${t.label}</span></div>
-        <div>${timeFa(t.time.toISOString())}</div>
-        <div>${t.height} متر</div>
-      </div>
-    `;
+    const isToday=t.time.toDateString()===now.toDateString();
+    tableHTML+=`<div class="tide-table-row"><div>${isToday?'امروز':'فردا'}</div><div><span class="tide-badge ${t.type}">${t.label}</span></div><div>${timeFa(t.time.toISOString())}</div><div>${t.height} متر</div></div>`;
   });
-  
   document.getElementById('tideTable').innerHTML=tableHTML;
 }
-
 async function loadWeather(){
   const city=citySelect.value,c=cities[city];if(!c){setStatus("شهر نامعتبر",true);return;}
   showSkeleton();
@@ -843,7 +785,7 @@ async function loadWeather(){
 
     // Render tide section (isolated so a tide-only failure never breaks the rest of the page)
     try{
-      renderTideSection();
+      await renderTideSection();
     }catch(tideErr){
       console.error("Tide render error:",tideErr);
       const ts=document.getElementById('tideSection');
