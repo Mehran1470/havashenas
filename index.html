@@ -57,7 +57,6 @@ select option{background:#0a1628;color:#fff;font-family:inherit}
 .stat-value{font-size:20px;font-weight:800;display:block}
 .stat-label{font-size:11px;color:var(--text-dim);margin-top:3px;font-weight:500}
 
-/* ===== TIDE SECTION ===== */
 .tide-section{margin:20px 0;animation:fadeInUp .8s ease-out .25s both}
 .tide-card{background:linear-gradient(135deg,rgba(0,210,211,.08),rgba(0,242,254,.04));border:1px solid rgba(0,210,211,.2);border-radius:var(--radius-sm);padding:16px 18px;backdrop-filter:blur(20px);box-shadow:var(--shadow),inset 0 1px 0 rgba(0,210,211,.08)}
 .tide-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
@@ -169,6 +168,11 @@ footer{text-align:center;padding:40px 0 20px;color:rgba(255,255,255,.35);font-si
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:10px}
 
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal-panel{background:#0e1c30;border:1px solid var(--glass-border);border-radius:var(--radius);padding:22px;max-width:380px;width:100%;box-shadow:var(--shadow)}
+.modal-title{font-size:17px;font-weight:800;margin-bottom:14px}
+
 @media(max-width:900px){.stats-grid{grid-template-columns:repeat(3,1fr)}.days-grid{grid-template-columns:repeat(4,1fr)}.detail-grid{grid-template-columns:repeat(2,1fr)}.map-container{aspect-ratio:4/3}.tide-table-row{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.hero{padding:22px}.temp-main{font-size:56px}.weather-svg{width:110px;height:110px}.days-grid{grid-template-columns:repeat(2,1fr);gap:6px}.day-card{padding:7px 4px}.section-title{font-size:18px}.stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}.stat-card{padding:14px 8px}.stat-value{font-size:18px}.hour-card{min-width:80px;padding:12px 6px}.hour-temp{font-size:22px}.map-container{aspect-ratio:1/1}.map-btn{font-size:12px;padding:9px 5px}.detail-grid{grid-template-columns:repeat(2,1fr)}.tide-next{grid-template-columns:1fr}.tide-table-row{grid-template-columns:1fr 1fr}}
 @media(max-width:400px){.logo-text{font-size:20px}.days-grid{grid-template-columns:1fr 1fr}.temp-main{font-size:48px}.stats-grid{grid-template-columns:repeat(2,1fr)}}
@@ -205,7 +209,7 @@ footer{text-align:center;padding:40px 0 20px;color:rgba(255,255,255,.35);font-si
 <div class="hero" id="heroCard">
   <div class="hero-top">
     <div class="hero-left">
-      <div class="city-name"><span class="live-dot"></span><span id="cityName">بندرعباس، هرمزگان</span></div>
+      <div class="city-name"><span class="live-dot"></span><span id="cityName">بندرعباس، هرمزگان</span><span id="maxAccuracyBadge" title="برای خاموش کردن بزن" style="display:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--accent-ocean);border:1px solid rgba(0,210,211,.4);border-radius:20px;padding:2px 8px;margin-right:6px">🌍 دقت حداکثری</span></div>
       <div class="date-str" id="dateStr">در حال دریافت اطلاعات...</div>
       <div class="desc" id="weatherDesc">—</div>
       <div class="feels">احساس دما: <span id="feelsLike">—</span></div>
@@ -229,12 +233,11 @@ footer{text-align:center;padding:40px 0 20px;color:rgba(255,255,255,.35);font-si
   </div>
 </div>
 
-<!-- ===== TIDE SECTION ===== -->
 <section class="tide-section" id="tideSection" style="display:none">
   <div class="tide-card">
     <div class="tide-header">
       <span class="section-icon">🌊</span>
-      <div class="section-title">جزر و مد <span style="font-size:14px;color:var(--text-dim);font-weight:400" id="tideCityLabel">بندرعباس</span></div>
+      <div class="section-title">جزر و مد <span style="font-size:14px;color:var(--text-dim);font-weight:400" id="tideCityLabel">بندرعباس</span><span id="tideAccuracyBadge" title="برای خاموش کردن بزن" style="display:none;cursor:pointer;font-size:11px;font-weight:600;color:var(--accent-ocean);border:1px solid rgba(0,210,211,.4);border-radius:20px;padding:2px 8px;margin-right:6px">🌍 دقت حداکثری</span></div>
     </div>
     
     <div class="tide-current">
@@ -315,11 +318,26 @@ footer{text-align:center;padding:40px 0 20px;color:rgba(255,255,255,.35);font-si
 <div class="status-bar" id="statusBar"><div class="status-dot"></div><span id="statusText">در حال اتصال...</span></div>
 </main>
 
-<footer><div style="opacity:.6">داده‌ها از Open-Meteo & Windy</div></footer>
+<footer><div id="footerTapZone" style="opacity:.6;padding:14px;display:inline-block">داده‌ها از Open-Meteo & Windy</div></footer>
+</div>
+
+<div class="modal-overlay" id="maxAccuracyConfirm">
+  <div class="modal-panel">
+    <div class="modal-title">🌍 حالت دقت حداکثری</div>
+    <div style="font-size:14px;line-height:1.9;color:var(--text-dim)">
+      این قابلیت با استفاده و مقایسه‌ی چندین منبع و مدل هواشناسی، دقیق‌ترین وضعیت و پیش‌بینی ممکن را برای موقعیت شما محاسبه می‌کند.<br><br>
+      ⚠️ توجه: این حالت برای پردازش داده‌های بیشتر به منابع اینترنتی و توان پردازشی بیشتری نیاز دارد.<br><br>
+      اگر دستگاه شما قدیمی یا ضعیف است، استفاده از این قابلیت پیشنهاد نمی‌شود.<br><br>
+      آیا می‌خواهید حالت دقت حداکثری را فعال کنید؟
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button id="maxAccuracyEnableBtn" style="flex:1;background:var(--accent);border:none;color:#fff;padding:12px;border-radius:var(--radius-sm);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">فعال کردن 🌍</button>
+      <button id="maxAccuracyCancelBtn" style="flex:1;background:rgba(255,255,255,.08);border:1px solid var(--glass-border);color:var(--text);padding:12px;border-radius:var(--radius-sm);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer">لغو</button>
+    </div>
+  </div>
 </div>
 
 <script>
-/* ===== WEATHER-REACTIVE ANIMATED BACKGROUND ===== */
 const canvas=document.getElementById('bgCanvas');
 const ctx=canvas.getContext('2d');
 let W,H,DPR=1;
@@ -332,10 +350,9 @@ function resize(){
 }
 window.addEventListener('resize',resize);resize();
 
-// mode: 'sunny' | 'cloudy' | 'rain' | 'snow' | 'night'  (night overrides everything else)
 let mode=(new Date().getHours()>=6&&new Date().getHours()<19)?'sunny':'night';
 let storming=false;
-let windSpeed=0; // km/h, drives cloud drift speed & rain slant
+let windSpeed=0;
 function setWindSpeed(kmh){windSpeed=Number(kmh)||0;}
 function setWeatherMode(code,isDay){
   if(!isDay){mode='night';storming=false;return;}
@@ -387,7 +404,7 @@ class Cloud{
     }
   }
   update(){
-    const windMult=1+Math.min(windSpeed,60)/28; // stronger wind -> faster drift
+    const windMult=1+Math.min(windSpeed,60)/28;
     const rainBoost=(mode==='rain'||mode==='snow')?1.6:1;
     this.x+=this.speed*windMult*rainBoost;
     if(this.x>W+300*this.scale)this.x=-300*this.scale;
@@ -474,7 +491,7 @@ function drawAmbientParticles(speedMult,alphaMult,color){
   particles.forEach(p=>{p.x+=p.dx*speedMult;p.y+=p.dy*speedMult;p.pulse+=.018;if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;const a=p.alpha*alphaMult*(.6+.4*Math.sin(p.pulse));ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`${color}${a})`;ctx.fill();});
 }
 function drawRain(){
-  const slant=1.1+Math.min(windSpeed,50)/18; // windier -> more diagonal, faster fall
+  const slant=1.1+Math.min(windSpeed,50)/18;
   raindrops.forEach(d=>{
     const grad=ctx.createLinearGradient(d.x,d.y,d.x-slant*2.5,d.y+d.len);
     grad.addColorStop(0,'rgba(190,220,255,0)');grad.addColorStop(1,`rgba(190,220,255,${d.alpha})`);
@@ -522,7 +539,6 @@ function drawBg(){
 }
 drawBg();
 
-/* ===== WEATHER & TIDE DATA ===== */
 const cities={
   "بندرعباس":{lat:27.1832,lon:56.2666,tideOffset:0},
   "هرمز":{lat:27.0890,lon:56.4525,tideOffset:12},
@@ -575,7 +591,6 @@ function faDate(iso){return new Date(iso).toLocaleDateString("fa-IR",{weekday:"l
 function timeFa(iso){return new Date(iso).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit",hour12:false});}
 function dayName(iso){return new Date(iso).toLocaleDateString("fa-IR",{weekday:"long"});}
 
-/* ===== MOON & TIDE CALCULATIONS ===== */
 function moonPhase(date){
   const y=date.getFullYear(),m=date.getMonth()+1,d=date.getDate();
   let yy=y-Math.floor((12-m)/10);
@@ -609,9 +624,6 @@ async function fetchTidesAt(lat,lon){
   return points;
 }
 
-// Bandar Abbas/Hormuz strait sits on a narrow, complex coastline where the marine
-// model's ~8km grid can miss usable sea data right at the shore. If the first try
-// comes back empty we nudge the coordinate a bit toward open water and retry.
 async function fetchTidesRobust(lat,lon){
   const offsets=[[0,0],[0.15,0.15],[-0.15,0.15],[0.15,-0.15],[-0.15,-0.15],[0.3,0],[0,0.3],[-0.3,0]];
   for(const [dLat,dLon] of offsets){
@@ -661,8 +673,6 @@ async function fetchTides(date,lat,lon){
     currentState=next.type==='high'?'در حال مد (افزایش)':'در حال جزر (کاهش)';
     currentPercent=50;
   }else{
-    // No clear peak/trough found nearby (sparse data) — fall back to a simple
-    // min/max read of the surrounding window so the gauge still shows something real.
     const windowPts=points.filter(p=>Math.abs(p.time-now)<12*3600*1000);
     if(windowPts.length>=3){
       const hs=windowPts.map(p=>p.height);
@@ -681,6 +691,97 @@ async function fetchTides(date,lat,lon){
 async function calculateTides(date,lat,lon){
   return fetchTides(date,lat,lon);
 }
+
+function getMaxAccuracy(){return localStorage.getItem('havashenas_maxAccuracy')==='1';}
+function setMaxAccuracy(v){
+  if(v)localStorage.setItem('havashenas_maxAccuracy','1');
+  else localStorage.removeItem('havashenas_maxAccuracy');
+  document.getElementById('maxAccuracyBadge').style.display=v?'':'none';
+  document.getElementById('tideAccuracyBadge').style.display='none';
+}
+
+const MAX_ACCURACY_MODELS=['ecmwf_ifs025','gfs_seamless','icon_seamless','meteofrance_seamless','gem_seamless'];
+async function applyMaxAccuracyWeather(lat,lon,refTimeIso){
+  const badge=document.getElementById('maxAccuracyBadge');
+  if(!getMaxAccuracy()){badge.style.display='none';return;}
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m&models=${MAX_ACCURACY_MODELS.join(',')}&timezone=auto&forecast_days=1`;
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok)throw new Error('multi-model fetch failed');
+    const d=await res.json();
+    const hourly=d.hourly;
+    if(!hourly||!hourly.time)throw new Error('bad multi-model response');
+    const idx=hourly.time.findIndex(t=>t>=refTimeIso);
+    const i=idx>=0?idx:0;
+    function avgFor(field){
+      const vals=MAX_ACCURACY_MODELS.map(m=>hourly[field+'_'+m]?.[i]).filter(v=>typeof v==='number'&&Number.isFinite(v));
+      if(!vals.length)return null;
+      return vals.reduce((a,b)=>a+b,0)/vals.length;
+    }
+    const avgTemp=avgFor('temperature_2m');
+    const avgHumidity=avgFor('relative_humidity_2m');
+    const avgWind=avgFor('wind_speed_10m');
+    if(avgTemp!=null){
+      document.getElementById('tempVal').textContent=Math.round(avgTemp);
+      document.getElementById('tempFeelsMini').textContent='میانگین '+MAX_ACCURACY_MODELS.length+' مدل';
+    }
+    if(avgHumidity!=null)document.getElementById('humidity').textContent=Math.round(avgHumidity)+'%';
+    if(avgWind!=null){document.getElementById('wind').textContent=Math.round(avgWind)+' km/h';setWindSpeed(avgWind);}
+    badge.style.display=(avgTemp!=null)?'':'none';
+  }catch(e){
+    console.error('Max accuracy weather error:',e);
+    badge.style.display='none';
+  }
+}
+
+async function fetchTidesODB(lat,lon,dateObj){
+  const dateStr=dateObj.toISOString().slice(0,10);
+  const url=`https://eco.odb.ntu.edu.tw/api/tide/forecast?lon=${lon}&lat=${lat}&date=${dateStr}&tz=%2B03:30`;
+  const res=await fetch(url,{cache:'no-store'});
+  if(!res.ok)return null;
+  const data=await res.json();
+  const day=data.days&&data.days[0];
+  if(!day||!day.tide||!day.tide.length)return null;
+  return day.tide.map(t=>({
+    time:new Date(t.time),
+    type:t.phen==='HIGH'?'high':'low',
+    label:t.phen==='HIGH'?'مد':'جزر',
+    height:(t.height/100).toFixed(2)
+  }));
+}
+
+async function applyMaxAccuracyTide(lat,lon){
+  const badge=document.getElementById('tideAccuracyBadge');
+  if(!getMaxAccuracy()||!lastTideData){badge.style.display='none';return;}
+  try{
+    const odbToday=await fetchTidesODB(lat,lon,new Date());
+    if(!odbToday||!odbToday.length){badge.style.display='none';return;}
+    function averageWithNearest(omEvent){
+      if(!omEvent)return null;
+      const sameType=odbToday.filter(o=>o.type===omEvent.type);
+      if(!sameType.length)return omEvent;
+      const nearest=sameType.reduce((a,b)=>Math.abs(a.time-omEvent.time)<Math.abs(b.time-omEvent.time)?a:b);
+      const avgTime=new Date((omEvent.time.getTime()+nearest.time.getTime())/2);
+      const avgHeight=((parseFloat(omEvent.height)+parseFloat(nearest.height))/2).toFixed(2);
+      return {time:avgTime,type:omEvent.type,label:omEvent.label,height:avgHeight};
+    }
+    const mergedHigh=averageWithNearest(lastTideData.today.nextHigh);
+    const mergedLow=averageWithNearest(lastTideData.today.nextLow);
+    if(mergedHigh){
+      document.getElementById('nextHighTime').textContent=timeFa(mergedHigh.time.toISOString());
+      document.getElementById('nextHighHeight').textContent='ارتفاع: '+mergedHigh.height+' متر';
+    }
+    if(mergedLow){
+      document.getElementById('nextLowTime').textContent=timeFa(mergedLow.time.toISOString());
+      document.getElementById('nextLowHeight').textContent='ارتفاع: '+mergedLow.height+' متر';
+    }
+    badge.style.display='';
+  }catch(e){
+    console.error('Max accuracy tide error:',e);
+    badge.style.display='none';
+  }
+}
+
 const citySelect=document.getElementById("citySelect");
 const statusBar=document.getElementById("statusBar"),statusText=document.getElementById("statusText");
 function setStatus(msg,err){statusText.textContent=msg;if(err)statusBar.classList.add("error");else statusBar.classList.remove("error");}
@@ -778,6 +879,7 @@ async function renderTideSection(){
     tableHTML+=`<div class="tide-table-row"><div>${isToday?'امروز':'فردا'}</div><div><span class="tide-badge ${t.type}">${t.label}</span></div><div>${timeFa(t.time.toISOString())}</div><div>${t.height} متر</div></div>`;
   });
   document.getElementById('tideTable').innerHTML=tableHTML;
+  applyMaxAccuracyTide(c.lat,c.lon).catch(()=>{});
 }
 async function loadWeather(){
   const city=citySelect.value,c=cities[city];if(!c){setStatus("شهر نامعتبر",true);return;}
@@ -791,7 +893,6 @@ async function loadWeather(){
     lastWeatherData=d;
     const cur=d.current;
     
-    // Moon phase
     const mp=moonPhase(new Date());
     document.getElementById('moonPhase').textContent=mp.name;
     
@@ -812,7 +913,6 @@ async function loadWeather(){
     document.getElementById("sunrise").textContent=timeFa(d.daily.sunrise[0]);
     document.getElementById("sunset").textContent=timeFa(d.daily.sunset[0]);
 
-    // Hourly cards
     const idx=d.hourly.time.findIndex(t=>t>=cur.time);
     const start=Math.max(0,idx);
     const end=Math.min(d.hourly.time.length,start+12);
@@ -832,7 +932,6 @@ async function loadWeather(){
     }
     document.getElementById("hourlyCards").innerHTML=hourHTML;
 
-    // Days grid
     const names=["امروز","فردا","پس‌فردا"];
     let daysHTML="";
     for(let i=0;i<7;i++){
@@ -849,10 +948,8 @@ async function loadWeather(){
     }
     document.getElementById("daysGrid").innerHTML=daysHTML;
 
-    // If a day was selected, refresh its detail
     if(selectedDayIndex>=0) showDayDetail(selectedDayIndex);
 
-    // Render tide section (isolated so a tide-only failure never breaks the rest of the page)
     try{
       await renderTideSection();
     }catch(tideErr){
@@ -862,6 +959,8 @@ async function loadWeather(){
       document.querySelector('#tideSection .tide-card').innerHTML='<div class="tide-header"><span class="section-icon">🌊</span><div class="section-title">جزر و مد</div></div><div style="color:var(--text-dim);font-size:13px;padding:8px 0">اطلاعات جزر و مد برای این شهر در دسترس نیست.</div>';
     }
 
+    applyMaxAccuracyWeather(c.lat,c.lon,cur.time).catch(()=>{});
+
     setStatus("✅ داده‌های زنده فعال است. اطلاعات از Open-Meteo دریافت می‌شود.");
     updateMap();
   }catch(e){
@@ -870,6 +969,33 @@ async function loadWeather(){
     document.getElementById("weatherDesc").textContent="خطا در بارگذاری";
   }
 }
+
+let footerTapCount=0,footerTapTimer=null;
+document.getElementById('footerTapZone').addEventListener('click',()=>{
+  footerTapCount++;
+  clearTimeout(footerTapTimer);
+  footerTapTimer=setTimeout(()=>{footerTapCount=0;document.getElementById('footerTapZone').textContent='داده‌ها از Open-Meteo & Windy';},4000);
+  if(footerTapCount>=7){
+    footerTapCount=0;
+    document.getElementById('footerTapZone').textContent='داده‌ها از Open-Meteo & Windy';
+    document.getElementById('maxAccuracyConfirm').classList.add('show');
+  }else if(footerTapCount>=3){
+    document.getElementById('footerTapZone').textContent=(7-footerTapCount)+' ضربه‌ی دیگر...';
+  }
+});
+document.getElementById('maxAccuracyEnableBtn').addEventListener('click',()=>{
+  setMaxAccuracy(true);
+  document.getElementById('maxAccuracyConfirm').classList.remove('show');
+  loadWeather();
+});
+document.getElementById('maxAccuracyCancelBtn').addEventListener('click',()=>{
+  document.getElementById('maxAccuracyConfirm').classList.remove('show');
+});
+document.getElementById('maxAccuracyConfirm').addEventListener('click',e=>{if(e.target.id==='maxAccuracyConfirm')document.getElementById('maxAccuracyConfirm').classList.remove('show');});
+document.getElementById('maxAccuracyBadge').addEventListener('click',()=>{setMaxAccuracy(false);loadWeather();});
+document.getElementById('tideAccuracyBadge').addEventListener('click',()=>{setMaxAccuracy(false);loadWeather();});
+
+if(getMaxAccuracy()){document.getElementById('maxAccuracyBadge').style.display='';}
 
 citySelect.addEventListener("change",loadWeather);
 loadWeather();
