@@ -586,10 +586,33 @@ function getIcon(code,isDay){
   if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code))return rain;if([71,73,75,77].includes(code))return snow;if([95,96,99].includes(code))return thunder;
   return isDay?sun:moon;
 }
+
 function wText(code){if(code===0)return"صاف";if([1,2].includes(code))return"کمی ابری";if(code===3)return"ابری";if([45,48].includes(code))return"مه‌آلود";if([51,53,55,56,57].includes(code))return"نم‌نم";if([61,63,65,66,67,80,81,82].includes(code))return"بارانی";if([71,73,75,77].includes(code))return"برفی";if([95,96,99].includes(code))return"رعدوبرق";return"نامشخص";}
 function faDate(iso){return new Date(iso).toLocaleDateString("fa-IR",{weekday:"long",year:"numeric",month:"long",day:"numeric"});}
 function timeFa(iso){return new Date(iso).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit",hour12:false});}
 function dayName(iso){return new Date(iso).toLocaleDateString("fa-IR",{weekday:"long"});}
+
+/* تشخیص دقیق روز و شب برای هر ساعت پیش‌بینی
+   از طلوع و غروب همان روز استفاده می‌کند تا به منطقه زمانی دستگاه وابسته نباشد. */
+function isDayForHourly(hourIso,daily){
+  if(!hourIso||!daily||!daily.time)return true;
+
+  const dateKey=String(hourIso).slice(0,10);
+  const dayIndex=daily.time.findIndex(t=>String(t).slice(0,10)===dateKey);
+
+  if(dayIndex<0)return true;
+
+  const sunrise=String(daily.sunrise?.[dayIndex]||'');
+  const sunset=String(daily.sunset?.[dayIndex]||'');
+
+  if(!sunrise||!sunset)return true;
+
+  const hourMinutes=String(hourIso).slice(11,16);
+  const sunriseMinutes=sunrise.slice(11,16);
+  const sunsetMinutes=sunset.slice(11,16);
+
+  return hourMinutes>=sunriseMinutes&&hourMinutes<sunsetMinutes;
+}
 
 function moonPhase(date){
   const y=date.getFullYear(),m=date.getMonth()+1,d=date.getDate();
@@ -830,6 +853,7 @@ function showDayDetail(idx){
     document.getElementById('detailGrid').innerHTML=items.map(it=>`<div class="detail-item"><span>${it.icon} ${it.label}</span><b>${it.val}</b></div>`).join('');
   }).catch(()=>{});
 }
+
 async function renderTideSection(){
   const city=citySelect.value;
   const c=cities[city];
@@ -881,6 +905,7 @@ async function renderTideSection(){
   document.getElementById('tideTable').innerHTML=tableHTML;
   applyMaxAccuracyTide(c.lat,c.lon).catch(()=>{});
 }
+
 async function loadWeather(){
   const city=citySelect.value,c=cities[city];if(!c){setStatus("شهر نامعتبر",true);return;}
   showSkeleton();
@@ -922,9 +947,15 @@ async function loadWeather(){
       const t=d.hourly.temperature_2m[i];
       const r=d.hourly.precipitation_probability[i]??0;
       const w=d.hourly.wind_speed_10m[i]??0;
+
+      /* اصلاح اصلی:
+         به جای اینکه همیشه 1 ارسال شود،
+         روز/شب واقعی همان ساعت از طلوع و غروب استخراج می‌شود. */
+      const hourlyIsDay=isDayForHourly(d.hourly.time[i],d.daily);
+
       hourHTML+=`<div class="hour-card ${isNow?'now':''}">
         <div class="hour-time">${isNow?'اکنون':timeFa(d.hourly.time[i])}</div>
-        <div class="hour-ico">${getIcon(d.hourly.weather_code[i],1).replace('width="100" height="100"','width="32" height="32"')}</div>
+        <div class="hour-ico">${getIcon(d.hourly.weather_code[i],hourlyIsDay).replace('width="100" height="100"','width="32" height="32"')}</div>
         <div class="hour-temp">${Math.round(t)}°</div>
         ${r>0?`<div class="hour-rain">💧 ${r}%</div>`:''}
         <div class="hour-wind">💨 ${Math.round(w)} km/h</div>
@@ -983,23 +1014,38 @@ document.getElementById('footerTapZone').addEventListener('click',()=>{
     document.getElementById('footerTapZone').textContent=(7-footerTapCount)+' ضربه‌ی دیگر...';
   }
 });
+
 document.getElementById('maxAccuracyEnableBtn').addEventListener('click',()=>{
   setMaxAccuracy(true);
   document.getElementById('maxAccuracyConfirm').classList.remove('show');
   loadWeather();
 });
+
 document.getElementById('maxAccuracyCancelBtn').addEventListener('click',()=>{
   document.getElementById('maxAccuracyConfirm').classList.remove('show');
 });
-document.getElementById('maxAccuracyConfirm').addEventListener('click',e=>{if(e.target.id==='maxAccuracyConfirm')document.getElementById('maxAccuracyConfirm').classList.remove('show');});
-document.getElementById('maxAccuracyBadge').addEventListener('click',()=>{setMaxAccuracy(false);loadWeather();});
-document.getElementById('tideAccuracyBadge').addEventListener('click',()=>{setMaxAccuracy(false);loadWeather();});
 
-if(getMaxAccuracy()){document.getElementById('maxAccuracyBadge').style.display='';}
+document.getElementById('maxAccuracyConfirm').addEventListener('click',e=>{
+  if(e.target.id==='maxAccuracyConfirm')document.getElementById('maxAccuracyConfirm').classList.remove('show');
+});
+
+document.getElementById('maxAccuracyBadge').addEventListener('click',()=>{
+  setMaxAccuracy(false);
+  loadWeather();
+});
+
+document.getElementById('tideAccuracyBadge').addEventListener('click',()=>{
+  setMaxAccuracy(false);
+  loadWeather();
+});
+
+if(getMaxAccuracy()){
+  document.getElementById('maxAccuracyBadge').style.display='';
+}
 
 citySelect.addEventListener("change",loadWeather);
 loadWeather();
 setInterval(loadWeather,10*60*1000);
 </script>
 </body>
-</html>
+        </html>
