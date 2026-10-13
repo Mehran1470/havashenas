@@ -1,0 +1,7816 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>نقشه دریایی و صیادی | خلیج فارس و دریای عمان</title>
+
+<script>
+/* نوار خطا: اگر جاوااسکریپت خطا بدهد، پیامش روی صفحه دیده می‌شود */
+(function(){
+  function show(msg){
+    try{
+      var b=document.getElementById("errBar");
+      if(!b){
+        b=document.createElement("div");
+        b.id="errBar";
+        b.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#7f1d1d;color:#fff;font:12px/1.7 sans-serif;padding:8px 12px;direction:ltr;text-align:left;max-height:30vh;overflow:auto";
+        b.onclick=function(){b.remove();};
+        (document.body||document.documentElement).appendChild(b);
+      }
+      b.textContent="JS error: "+msg+" (tap to hide)";
+    }catch(e){}
+  }
+  window.addEventListener("error",function(e){ show((e.message||"error")+(e.lineno?" @"+e.lineno:"")); });
+  window.addEventListener("unhandledrejection",function(e){ show("promise: "+((e.reason&&e.reason.message)||e.reason)); });
+  /* منابع جایگزین Leaflet */
+  window.LF_JS=["https://unpkg.com/leaflet@1.9.4/dist/leaflet.js","https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js","https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"];
+  window.LF_CSS=["https://unpkg.com/leaflet@1.9.4/dist/leaflet.css","https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css","https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"];
+  var ci=0;
+  window.cssFallback=function(el){
+    if(ci<LF_CSS.length) el.href=LF_CSS[ci++];
+    else el.onerror=null;
+  };
+})();
+</script>
+<link rel="stylesheet" href="leaflet/leaflet.css" onerror="cssFallback(this)">
+
+<style>
+*{
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent
+}
+
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  font-family:Vazirmatn,system-ui,Tahoma,Arial,sans-serif;
+  background:#dfe9e9;
+  color:#17302f
+}
+
+button,input,select{
+  font:inherit
+}
+
+button{
+  border:0;
+  cursor:pointer
+}
+
+#map{
+  position:fixed;
+  inset:0;
+  z-index:1;
+}
+
+/* =========================
+   TOP BAR
+========================= */
+
+.topbar{
+  position:fixed;
+  top:max(12px,env(safe-area-inset-top));
+  left:12px;
+  right:12px;
+  z-index:2000;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  pointer-events:none
+}
+
+.topbar>*{
+  pointer-events:auto
+}
+
+.icon-btn,
+.location-btn{
+  width:45px;
+  height:45px;
+  flex:none;
+  border-radius:14px;
+  display:grid;
+  place-items:center;
+  box-shadow:0 8px 25px rgba(0,0,0,.16);
+  font-size:21px
+}
+
+.icon-btn{
+  background:rgba(255,255,255,.96);
+  color:#17302f
+}
+
+.location-btn{
+  background:#0f766e;
+  color:#fff
+}
+
+.search-box{
+  flex:1;
+  min-width:0;
+  height:45px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 13px;
+  border-radius:14px;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 8px 25px rgba(0,0,0,.16)
+}
+
+.search-box span{
+  font-size:20px;
+  opacity:.55
+}
+
+#searchInput{
+  width:100%;
+  min-width:0;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:#17302f
+}
+
+#searchInput::placeholder{
+  color:#718180
+}
+
+/* =========================
+   SEARCH RESULTS
+========================= */
+
+.search-results{
+  position:fixed;
+  top:max(66px,calc(env(safe-area-inset-top) + 56px));
+  left:12px;
+  right:12px;
+  max-width:600px;
+  margin:auto;
+  z-index:2100;
+  display:none;
+  overflow:hidden;
+  background:#fff;
+  border-radius:15px;
+  box-shadow:0 12px 35px rgba(0,0,0,.18)
+}
+
+.search-results.open{
+  display:block
+}
+
+.search-result{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:12px;
+  border-bottom:1px solid #e5eded;
+  cursor:pointer
+}
+
+.search-result:last-child{
+  border-bottom:0
+}
+
+.search-icon{
+  width:35px;
+  height:35px;
+  flex:none;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  background:#e9f4f3
+}
+
+.search-text{
+  min-width:0
+}
+
+.search-text strong{
+  display:block;
+  font-size:12px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+.search-text small{
+  display:block;
+  margin-top:2px;
+  font-size:10px;
+  color:#647776
+}
+
+/* =========================
+   OVERLAY
+========================= */
+
+.overlay{
+  position:fixed;
+  inset:0;
+  z-index:2900;
+  background:rgba(0,0,0,.22);
+  opacity:0;
+  visibility:hidden;
+  transition:.25s
+}
+
+.overlay.open{
+  opacity:1;
+  visibility:visible
+}
+
+/* =========================
+   SIDE PANEL
+========================= */
+
+.side-panel{
+  position:fixed;
+  top:0;
+  right:0;
+  bottom:0;
+  width:min(390px,92vw);
+  z-index:3000;
+  background:rgba(248,252,252,.98);
+  box-shadow:-15px 0 45px rgba(0,0,0,.18);
+  transform:translateX(105%);
+  transition:transform .28s cubic-bezier(.2,.8,.2,1);
+  display:flex;
+  flex-direction:column;
+  pointer-events:auto
+}
+
+.side-panel.open{
+  transform:none
+}
+
+.panel-head{
+  min-height:70px;
+  padding:12px 15px;
+  padding-top:max(12px,env(safe-area-inset-top));
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid #dce6e5
+}
+
+.panel-title strong{
+  display:block;
+  font-size:17px
+}
+
+.panel-title small{
+  display:block;
+  margin-top:3px;
+  color:#657877;
+  font-size:10px
+}
+
+.close-btn{
+  width:40px;
+  height:40px;
+  flex:none;
+  border-radius:12px;
+  background:#edf3f3;
+  font-size:22px;
+  color:#17302f
+}
+
+.panel-body{
+  flex:1;
+  overflow:auto;
+  padding:13px;
+  padding-bottom:max(13px,env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling:touch
+}
+
+/* =========================
+   CARDS
+========================= */
+
+.status-card,
+.stat,
+.setting,
+.port,
+.filter{
+  background:#fff;
+  border:1px solid #dfe8e7
+}
+
+.status-card{
+  padding:13px;
+  border-radius:17px
+}
+
+.status-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between
+}
+
+.status-label{
+  color:#647776;
+  font-size:11px
+}
+
+.status-value{
+  margin-top:3px;
+  font-size:14px;
+  font-weight:800
+}
+
+.status-dot{
+  width:11px;
+  height:11px;
+  border-radius:50%;
+  background:#f59e0b;
+  box-shadow:0 0 0 5px rgba(245,158,11,.14)
+}
+
+.status-dot.online{
+  background:#16a34a;
+  box-shadow:0 0 0 5px rgba(22,163,74,.14)
+}
+
+.status-dot.error{
+  background:#dc2626;
+  box-shadow:0 0 0 5px rgba(220,38,38,.14)
+}
+
+.stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:10px
+}
+
+.stat{
+  padding:11px;
+  border-radius:14px
+}
+
+.stat span{
+  display:block;
+  color:#647776;
+  font-size:10px
+}
+
+.stat strong{
+  display:block;
+  margin-top:4px;
+  font-size:17px
+}
+
+/* =========================
+   SECTIONS
+========================= */
+
+.section{
+  margin-top:17px
+}
+
+.section-title{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px;
+  font-size:13px;
+  font-weight:800
+}
+
+.section-title small{
+  color:#718180;
+  font-weight:500
+}
+
+/* =========================
+   FILTERS
+========================= */
+
+.filters{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px
+}
+
+.filter{
+  min-height:40px;
+  border-radius:12px;
+  color:#17302f;
+  font-size:12px
+}
+
+.filter.active{
+  background:#0f766e;
+  color:#fff;
+  border-color:#0f766e
+}
+
+/* =========================
+   PORTS
+========================= */
+
+.ports{
+  display:flex;
+  flex-direction:column;
+  gap:7px
+}
+
+.port{
+  width:100%;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:10px;
+  text-align:right;
+  border-radius:13px;
+  color:#17302f
+}
+
+.port-icon{
+  width:35px;
+  height:35px;
+  flex:none;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  background:#e7f3f2
+}
+
+.port-text{
+  min-width:0
+}
+
+.port-text strong{
+  display:block;
+  font-size:12px
+}
+
+.port-text small{
+  display:block;
+  margin-top:2px;
+  font-size:10px;
+  color:#657776
+}
+
+/* =========================
+   SETTINGS
+========================= */
+
+.setting{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:11px;
+  margin-bottom:7px;
+  border-radius:13px
+}
+
+.setting-text{
+  min-width:0
+}
+
+.setting-text strong{
+  display:block;
+  font-size:12px
+}
+
+.setting-text small{
+  display:block;
+  margin-top:3px;
+  font-size:10px;
+  color:#657776
+}
+
+/* =========================
+   SWITCH
+========================= */
+
+.switch{
+  width:44px;
+  height:25px;
+  padding:3px;
+  border-radius:50px;
+  background:#d4dfde;
+  flex:none
+}
+
+.switch::after{
+  content:"";
+  display:block;
+  width:19px;
+  height:19px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 2px 5px rgba(0,0,0,.2);
+  transition:.2s
+}
+
+.switch.on{
+  background:#0f766e
+}
+
+.switch.on::after{
+  transform:translateX(-19px)
+}
+
+/* =========================
+   ROUTING
+========================= */
+
+.route-card{
+  background:#fff;
+  border:1px solid #dfe8e7;
+  border-radius:17px;
+  padding:12px
+}
+
+.route-label{
+  display:block;
+  margin-bottom:5px;
+  font-size:10px;
+  color:#647776
+}
+
+.route-select{
+  width:100%;
+  min-height:42px;
+  border:1px solid #d5e2e1;
+  border-radius:11px;
+  background:#f8fbfb;
+  color:#17302f;
+  padding:0 10px;
+  outline:0;
+  margin-bottom:9px
+}
+
+.route-select:focus{
+  border-color:#0f766e
+}
+
+.route-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px
+}
+
+.route-action{
+  min-height:40px;
+  border-radius:11px;
+  background:#0f766e;
+  color:#fff;
+  font-size:11px;
+  font-weight:700
+}
+
+.route-action.secondary{
+  background:#edf3f3;
+  color:#17302f
+}
+
+.route-action.danger{
+  background:#fff1f1;
+  color:#b91c1c
+}
+
+.route-result{
+  margin-top:9px;
+  padding:9px;
+  border-radius:11px;
+  background:#eef6f5;
+  border:1px solid #dcebea;
+  font-size:11px;
+  line-height:1.9
+}
+
+.route-result strong{
+  color:#0f766e
+}
+
+.route-stats{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  margin-top:7px
+}
+
+.route-stat{
+  background:#fff;
+  border:1px solid #dfe8e7;
+  border-radius:9px;
+  padding:7px
+}
+
+.route-stat span{
+  display:block;
+  color:#718180;
+  font-size:9px
+}
+
+.route-stat strong{
+  display:block;
+  margin-top:2px;
+  font-size:11px
+}
+
+.route-note{
+  display:block;
+  margin-top:7px;
+  color:#7a8b8a;
+  font-size:9px;
+  line-height:1.8
+}
+
+.route-map-pick{
+  margin-top:7px;
+  width:100%;
+  min-height:38px;
+  border-radius:10px;
+  background:#e7f3f2;
+  color:#0f766e;
+  font-size:11px;
+  font-weight:700
+}
+
+.route-map-pick.active{
+  background:#0f766e;
+  color:#fff
+}
+
+.route-line{
+  filter:drop-shadow(0 2px 4px rgba(15,118,110,.3))
+}
+
+.route-destination-marker{
+  width:30px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#dc2626;
+  border:3px solid #fff;
+  box-shadow:0 3px 10px rgba(0,0,0,.35);
+  color:#fff;
+  font-size:14px
+}
+
+/* =========================
+   SHIPS
+========================= */
+
+.ship-marker{
+  position:relative;
+  width:20px;
+  height:20px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  border:1.5px solid #fff;
+  color:#fff;
+  font-size:10px;
+  box-shadow:0 1px 5px rgba(0,0,0,.45)
+}
+
+.hit{
+  display:grid;
+  place-items:center
+}
+
+.ship-marker .dir{
+  position:absolute;
+  inset:-5px;
+  pointer-events:none
+}
+
+.ship-marker .dir::before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:50%;
+  margin-left:-3px;
+  border:3px solid transparent;
+  border-bottom:5px solid #17302f;
+  border-top:0
+}
+
+.ship-marker.fav::after{
+  content:"★";
+  position:absolute;
+  top:-8px;
+  right:-6px;
+  font-size:11px;
+  color:#f5b301;
+  text-shadow:0 0 2px #17302f,0 0 2px #17302f
+}
+
+.ship-marker.idle{
+  opacity:.6
+}
+
+.ship-cargo{
+  background:#2563eb
+}
+
+.ship-tanker{
+  background:#dc2626
+}
+
+.ship-passenger{
+  background:#9333ea
+}
+
+.ship-other{
+  background:#475569
+}
+
+/* =========================
+   POPUP
+========================= */
+
+.leaflet-popup{
+  z-index:2500!important
+}
+
+.leaflet-popup-content-wrapper{
+  border-radius:15px
+}
+
+.leaflet-popup-content{
+  margin:0!important;
+  width:255px!important;
+  max-width:calc(100vw - 40px)!important
+}
+
+.popup{
+  padding:13px;
+  direction:rtl
+}
+
+.popup h3{
+  margin:0 0 9px;
+  font-size:14px
+}
+
+.popup-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px
+}
+
+.popup-item{
+  padding:7px;
+  background:#f1f6f6;
+  border-radius:9px
+}
+
+.popup-item span{
+  display:block;
+  font-size:10px;
+  color:#6c7d7c
+}
+
+.popup-item strong{
+  display:block;
+  margin-top:2px;
+  font-size:11px
+}
+
+.fv{
+  width:100%;
+  margin-top:8px;
+  padding:9px;
+  border-radius:11px;
+  background:#0f766e;
+  color:#fff;
+  font-size:13px;
+  font-weight:700
+}
+
+.route-popup-btn{
+  background:#17302f
+}
+
+/* =========================
+   LEAFLET
+========================= */
+
+.leaflet-control-container{
+  z-index:500
+}
+
+.leaflet-top{
+  top:calc(max(12px,env(safe-area-inset-top)) + 58px)
+}
+
+.leaflet-left{
+  left:10px
+}
+
+.leaflet-control-zoom{
+  border:0!important;
+  box-shadow:0 7px 22px rgba(0,0,0,.15)!important;
+  border-radius:13px!important;
+  overflow:hidden
+}
+
+.leaflet-control-zoom a{
+  width:40px!important;
+  height:40px!important;
+  line-height:40px!important;
+  border:0!important;
+  background:rgba(255,255,255,.95)!important;
+  color:#17302f!important;
+  font-size:20px!important
+}
+
+/* =========================
+   OFFLINE DOWNLOAD
+========================= */
+
+.dl-bar{
+  height:6px;
+  border-radius:6px;
+  background:#dfe8e7;
+  margin:9px 0;
+  overflow:hidden
+}
+
+.dl-bar i{
+  display:block;
+  height:100%;
+  width:0;
+  background:#0f766e;
+  transition:width .2s
+}
+
+.dl-row{
+  display:flex;
+  gap:8px
+}
+
+.dl-row .fv{
+  margin-top:0
+}
+
+.dl-clr{
+  background:#edf3f3!important;
+  color:#17302f!important
+}
+
+.dl-note{
+  display:block;
+  margin-top:7px;
+  font-size:10px;
+  color:#657776
+}
+
+/* =========================
+   TIDE FAB
+========================= */
+
+.tide-fab{
+  position:fixed;
+  left:12px;
+  bottom:max(22px,env(safe-area-inset-bottom));
+  z-index:2000;
+  width:46px;
+  height:46px;
+  border-radius:50%;
+  background:#0f766e;
+  color:#fff;
+  font-size:22px;
+  display:grid;
+  place-items:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.25)
+}
+
+/* =========================================================
+   TIDE SHEET
+========================================================= */
+
+.tide-sheet{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:3100;
+  width:100%;
+  height:auto;
+  max-height:min(76vh,680px);
+  background:#f8fcfc;
+  border-radius:20px 20px 0 0;
+  box-shadow:0 -12px 40px rgba(0,0,0,.22);
+  transform:translateY(105%);
+  transition:transform .28s cubic-bezier(.2,.8,.2,1);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  visibility:hidden;
+  pointer-events:none;
+  padding-bottom:env(safe-area-inset-bottom);
+  isolation:isolate
+}
+
+.tide-sheet.open{
+  transform:translateY(0);
+  visibility:visible;
+  pointer-events:auto
+}
+
+.ts-head{
+  flex:0 0 auto;
+  min-height:60px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:11px 14px 7px;
+  border-bottom:1px solid #dce7e6;
+  background:#f8fcfc;
+  position:relative;
+  z-index:2
+}
+
+.ts-head>div{
+  min-width:0
+}
+
+.ts-head strong{
+  display:block;
+  font-size:15px;
+  line-height:1.5;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+.ts-head small{
+  display:block;
+  margin-top:2px;
+  font-size:10px;
+  color:#657877;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+.ts-head .close-btn{
+  flex:none
+}
+
+.ts-chips{
+  flex:0 0 auto;
+  width:100%;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:7px 14px 9px;
+  background:#f8fcfc;
+  border-bottom:1px solid #e4eceb;
+  white-space:nowrap;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  position:relative;
+  z-index:2
+}
+
+.ts-chips::-webkit-scrollbar{
+  display:none
+}
+
+.ts-chip{
+  flex:none;
+  min-height:34px;
+  padding:6px 12px;
+  border-radius:12px;
+  background:#fff;
+  border:1px solid #dce7e6;
+  color:#17302f;
+  font-size:12px;
+  white-space:nowrap;
+  box-shadow:0 1px 3px rgba(0,0,0,.03)
+}
+
+.ts-chip:active{
+  transform:scale(.97)
+}
+
+.ts-chip.on{
+  background:#0f766e;
+  color:#fff;
+  border-color:#0f766e
+}
+
+.ts-body{
+  flex:1 1 auto;
+  min-height:0;
+  width:100%;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:10px 14px 16px;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  direction:rtl
+}
+
+.tl{
+  width:100%;
+  min-height:80px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px 8px;
+  text-align:center;
+  font-size:12px;
+  line-height:1.9;
+  color:#415a59
+}
+
+.dcard{
+  width:100%;
+  min-width:0;
+  background:#fff;
+  border:1px solid #dfe8e7;
+  border-radius:16px;
+  padding:10px;
+  margin:0 0 10px;
+  overflow:hidden;
+  box-shadow:0 2px 8px rgba(0,0,0,.035)
+}
+
+.dcard:last-child{
+  margin-bottom:0
+}
+
+.dtitle{
+  width:100%;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.6;
+  margin-bottom:8px;
+  overflow:hidden
+}
+
+.dtitle>span{
+  flex:none;
+  font-size:10px;
+  font-weight:700;
+  background:#e7f3f2;
+  color:#0f766e;
+  border-radius:8px;
+  padding:3px 8px;
+  white-space:nowrap
+}
+
+.dcard svg{
+  width:100%;
+  height:auto;
+  min-height:82px;
+  display:block;
+  overflow:hidden;
+  border-radius:10px
+}
+
+.dpeaks{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:6px;
+  margin-top:8px
+}
+
+.dpeaks>div{
+  min-width:0;
+  background:#f1f6f6;
+  border-radius:9px;
+  padding:7px 8px;
+  font-size:11px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  overflow:hidden
+}
+
+.dpeaks>div span{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+.dpeaks>div strong{
+  flex:none;
+  white-space:nowrap
+}
+
+.dnote{
+  width:100%;
+  font-size:9px;
+  color:#8a9a99;
+  line-height:1.8;
+  margin:4px 2px 0;
+  overflow-wrap:anywhere
+}
+
+/* =========================
+   TOAST
+========================= */
+
+.toast{
+  position:fixed;
+  z-index:4000;
+  left:50%;
+  bottom:max(24px,env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  max-width:calc(100vw - 30px);
+  padding:10px 16px;
+  border-radius:14px;
+  background:#17302f;
+  color:#fff;
+  font-size:13px;
+  display:none;
+  text-align:center
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media(max-width:600px){
+
+  .topbar{
+    top:max(8px,env(safe-area-inset-top));
+    left:8px;
+    right:8px;
+    gap:6px
+  }
+
+  .icon-btn,
+  .location-btn{
+    width:42px;
+    height:42px;
+    border-radius:13px
+  }
+
+  .search-box{
+    height:42px;
+    border-radius:13px;
+    padding:0 11px
+  }
+
+  .search-box span{
+    font-size:18px
+  }
+
+  #searchInput{
+    font-size:13px
+  }
+
+  .search-results{
+    top:calc(max(8px,env(safe-area-inset-top)) + 50px);
+    left:8px;
+    right:8px
+  }
+
+  .leaflet-top{
+    top:calc(max(8px,env(safe-area-inset-top)) + 58px)
+  }
+
+  .leaflet-left{
+    left:8px
+  }
+
+  .leaflet-control-zoom a{
+    width:40px!important;
+    height:40px!important;
+    line-height:40px!important
+  }
+
+  .tide-fab{
+    left:10px;
+    bottom:max(18px,env(safe-area-inset-bottom));
+    width:44px;
+    height:44px
+  }
+
+  .side-panel{
+    width:min(380px,94vw)
+  }
+
+  .panel-head{
+    min-height:64px
+  }
+
+  .panel-body{
+    padding:11px
+  }
+
+  .stats{
+    gap:6px
+  }
+
+  .stat{
+    padding:10px
+  }
+
+  .filters{
+    gap:6px
+  }
+
+  .filter{
+    min-height:38px;
+    font-size:11px
+  }
+
+  .leaflet-popup-content{
+    width:245px!important
+  }
+
+  .popup{
+    padding:11px
+  }
+
+  .route-actions{
+    grid-template-columns:1fr
+  }
+
+  .tide-sheet{
+    max-height:82dvh;
+    border-radius:19px 19px 0 0
+  }
+
+  .ts-head{
+    min-height:57px;
+    padding:9px 12px 6px
+  }
+
+  .ts-head strong{
+    font-size:14px
+  }
+
+  .ts-chips{
+    padding:6px 12px 8px
+  }
+
+  .ts-chip{
+    min-height:33px;
+    padding:6px 10px;
+    font-size:11px
+  }
+
+  .ts-body{
+    padding:9px 12px 14px
+  }
+
+  .dcard{
+    padding:9px;
+    border-radius:14px;
+    margin-bottom:9px
+  }
+
+  .dtitle{
+    font-size:12px
+  }
+
+  .dpeaks{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:5px
+  }
+
+  .dpeaks>div{
+    padding:7px 6px;
+    font-size:10px
+  }
+
+  .dnote{
+    font-size:9px
+  }
+}
+
+@media(max-width:380px){
+
+  .topbar{
+    gap:5px
+  }
+
+  .icon-btn,
+  .location-btn{
+    width:39px;
+    height:39px
+  }
+
+  .search-box{
+    height:39px
+  }
+
+  .search-box span{
+    display:none
+  }
+
+  #searchInput{
+    font-size:12px
+  }
+
+  .leaflet-control-zoom a{
+    width:37px!important;
+    height:37px!important;
+    line-height:37px!important
+  }
+
+  .tide-fab{
+    width:42px;
+    height:42px
+  }
+
+  .dpeaks{
+    grid-template-columns:1fr
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+
+  .overlay,
+  .side-panel,
+  .tide-sheet,
+  .switch::after{
+    transition:none
+  }
+}
+
+button,
+.leaflet-control,
+.ship-marker{
+  user-select:none;
+  -webkit-user-select:none
+}
+/* =========================
+   FISHING / SEAFARING
+========================= */
+
+.spot-pin{
+  width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  font-size:19px;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))
+}
+
+.spot-pin.mob{
+  font-size:22px
+}
+
+.hud{
+  position:fixed;
+  top:calc(max(8px,env(safe-area-inset-top)) + 56px);
+  left:62px;
+  right:10px;
+  z-index:1900;
+  display:none;
+  padding:8px 11px;
+  border-radius:13px;
+  background:rgba(23,48,47,.92);
+  color:#fff;
+  font-size:12px;
+  line-height:1.8;
+  box-shadow:0 6px 20px rgba(0,0,0,.25);
+  pointer-events:none
+}
+
+.mob-fab{
+  position:fixed;
+  right:12px;
+  bottom:max(22px,env(safe-area-inset-bottom));
+  z-index:2000;
+  width:54px;
+  height:54px;
+  border-radius:50%;
+  background:#dc2626;
+  color:#fff;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.2;
+  box-shadow:0 8px 24px rgba(220,38,38,.45);
+  border:3px solid #fff
+}
+
+.mob-fab:active{
+  transform:scale(.94)
+}
+
+.ts-clock{
+  flex:none;
+  margin-inline-start:auto;
+  padding:2px 8px;
+  border-radius:8px;
+  background:#e7f3f2;
+  color:#0f766e;
+  font-size:11px;
+  font-weight:700;
+  line-height:1.7;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+  direction:ltr
+}
+/* =========================
+   NAVIONICS-STYLE UI
+========================= */
+
+.navbar{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  z-index:2600;
+  display:flex;
+  background:rgba(255,255,255,.97);
+  border-top:1px solid #dce6e5;
+  box-shadow:0 -6px 22px rgba(0,0,0,.12);
+  padding-bottom:env(safe-area-inset-bottom)
+}
+
+.navbar button{
+  flex:1;
+  min-height:56px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:1px;
+  background:transparent;
+  color:#4b6160;
+  font-size:10px
+}
+
+.navbar button i{
+  font-style:normal;
+  font-size:20px;
+  line-height:1.2
+}
+
+.navbar button.on{
+  color:#0f766e;
+  font-weight:800
+}
+
+.leaflet-bottom{
+  bottom:calc(58px + env(safe-area-inset-bottom))
+}
+
+.fab-stack{
+  position:fixed;
+  right:12px;
+  bottom:calc(72px + env(safe-area-inset-bottom));
+  z-index:2000;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px
+}
+
+.fab-stack .mob-fab{
+  position:static
+}
+
+.measure-fab{
+  width:46px;
+  height:46px;
+  border-radius:50%;
+  background:#fff;
+  color:#17302f;
+  font-size:21px;
+  box-shadow:0 8px 24px rgba(0,0,0,.25)
+}
+
+.measure-fab.on{
+  background:#2563eb;
+  color:#fff
+}
+
+.tide-fab{
+  left:12px;
+  bottom:calc(112px + env(safe-area-inset-bottom))
+}
+
+.toast{
+  bottom:calc(76px + env(safe-area-inset-bottom))
+}
+
+.layer-card{
+  position:fixed;
+  left:10px;
+  right:10px;
+  bottom:calc(66px + env(safe-area-inset-bottom));
+  max-width:430px;
+  margin:auto;
+  z-index:3150;
+  max-height:70vh;
+  overflow:auto;
+  padding:12px;
+  background:rgba(248,252,252,.98);
+  border-radius:18px;
+  box-shadow:0 12px 40px rgba(0,0,0,.28);
+  transform:translateY(130%);
+  visibility:hidden;
+  transition:transform .25s cubic-bezier(.2,.8,.2,1)
+}
+
+.layer-card.open{
+  transform:none;
+  visibility:visible
+}
+
+.layer-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:10px;
+  font-size:14px
+}
+
+.measure-bar{
+  position:fixed;
+  left:10px;
+  right:76px;
+  bottom:calc(66px + env(safe-area-inset-bottom));
+  z-index:2200;
+  display:none;
+  padding:10px 12px;
+  border-radius:15px;
+  background:rgba(255,255,255,.97);
+  box-shadow:0 8px 28px rgba(0,0,0,.25);
+  font-size:12px;
+  line-height:1.9
+}
+
+body.measuring .tide-fab{
+  display:none
+}
+
+.m-tip{
+  padding:1px 6px;
+  border:0;
+  border-radius:7px;
+  background:#2563eb;
+  color:#fff;
+  font-size:10px;
+  font-weight:700;
+  box-shadow:0 2px 6px rgba(0,0,0,.3)
+}
+
+.m-tip::before{
+  display:none
+}
+
+body.night{
+  background:#0b1d1c
+}
+
+body.night #map{
+  background:#0b1d1c
+}
+
+body.night .base-tiles{
+  filter:invert(1) hue-rotate(180deg) brightness(.82) contrast(.92)
+}
+
+@media(max-width:600px){
+  .tide-fab{
+    left:10px;
+    bottom:calc(112px + env(safe-area-inset-bottom))
+  }
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<div class="topbar">
+
+  <button class="icon-btn" id="menuBtn" aria-label="منو">☰</button>
+
+  <div class="search-box">
+    <span>⌕</span>
+
+    <input
+      id="searchInput"
+      type="search"
+      placeholder="جستجوی کشتی یا بندر..."
+      autocomplete="off">
+  </div>
+
+  <button
+    class="location-btn"
+    id="locationBtn"
+    aria-label="موقعیت من">
+    ⌖
+  </button>
+
+</div>
+
+<div id="searchResults" class="search-results"></div>
+
+<div id="overlay" class="overlay"></div>
+
+<!-- =========================
+     جزر و مد
+========================= -->
+
+<button
+  class="tide-fab"
+  id="tideFab"
+  aria-label="جزر و مد چند روز آینده">
+  🌊
+</button>
+
+<section
+  class="tide-sheet"
+  id="tideSheet"
+  aria-label="جزر و مد">
+
+  <div class="ts-head">
+
+    <div>
+
+      <strong>🌊 جزر و مد ۷ روز آینده</strong>
+
+      <small id="tideSub">—</small>
+
+    </div>
+
+    <span class="ts-clock" id="tideClock" title="ساعت محلی نقطه‌ی انتخاب‌شده">--:--:--</span>
+
+    <button
+      class="close-btn"
+      id="tideClose"
+      aria-label="بستن">
+      ×
+    </button>
+
+  </div>
+
+  <div class="ts-chips" id="tideChips"></div>
+
+  <div class="ts-body" id="tideBody">
+
+    <div class="tl">
+      یک نقطه یا بندر را انتخاب کنید.
+    </div>
+
+  </div>
+
+</section>
+
+<div class="hud" id="hud"></div>
+
+<nav class="navbar" id="navbar" aria-label="ناوبری">
+  <button data-nav="explore"><i>🧭</i><span>اکتشاف</span></button>
+  <button data-nav="layers"><i>🗺️</i><span>لایه‌ها</span></button>
+  <button data-nav="route"><i>🛣️</i><span>مسیر</span></button>
+  <button data-nav="spots"><i>📌</i><span>نقاط</span></button>
+  <button data-nav="more"><i>☰</i><span>بیشتر</span></button>
+</nav>
+
+<div class="layer-card" id="layerCard">
+  <div class="layer-head">
+    <strong>🗺️ لایه‌ها و تنظیمات</strong>
+    <button class="close-btn" id="layerClose" aria-label="بستن">×</button>
+  </div>
+
+  <div class="setting">
+    <div class="setting-text">
+      <strong>علائم دریایی (OpenSeaMap)</strong>
+      <small>شناور، فانوس دریایی، بندر، موانع و برخی عمق‌ها. با «دانلود» نقشه آفلاین هم ذخیره می‌شود. پوشش بعضی مناطق کم است.</small>
+    </div>
+    <button class="switch" id="seaSwitch" aria-label="علائم دریایی"></button>
+  </div>
+
+  <div class="setting">
+    <div class="setting-text">
+      <strong>حالت شب</strong>
+      <small>نقشه‌ی تیره برای دریا در شب</small>
+    </div>
+    <button class="switch" id="nightSwitch" aria-label="حالت شب"></button>
+  </div>
+
+  <div class="setting" style="display:block">
+    <div class="setting-text"><strong>واحد فاصله</strong></div>
+    <div class="route-actions" style="grid-template-columns:1fr 1fr;margin-top:7px">
+      <button class="route-action" id="unitNm">مایل دریایی (nm)</button>
+      <button class="route-action secondary" id="unitKm">کیلومتر (km)</button>
+    </div>
+  </div>
+
+  <small class="route-note" style="margin:6px 2px 0">نقشه‌ی رسمی دریایی با عمق‌سنجی دقیق (مثل Navionics) دارای مجوز و پولی است و در این برنامه نیست. فقط به این نقشه برای ناوبری و عمق تکیه نکنید.</small>
+</div>
+
+<div class="measure-bar" id="measureBar">
+  <div id="measureText">📏 روی نقشه نقطه‌ها را لمس کنید</div>
+  <div class="route-actions" style="grid-template-columns:repeat(3,1fr);margin-top:7px">
+    <button class="route-action secondary" id="measureUndo">↩ واگرد</button>
+    <button class="route-action secondary" id="measureClear">🧹 پاک</button>
+    <button class="route-action" id="measureDone">✓ پایان</button>
+  </div>
+</div>
+
+<div class="fab-stack">
+  <button class="measure-fab" id="measureBtn" aria-label="اندازه‌گیری">📏</button>
+  <button class="mob-fab" id="mobBtn" aria-label="سقوط به دریا">🆘<br>MOB</button>
+</div>
+
+
+<div class="toast" id="toast"></div>
+
+<!-- =========================
+     SIDE PANEL
+========================= -->
+
+<aside id="sidePanel" class="side-panel">
+
+  <div class="panel-head">
+
+    <div class="panel-title">
+
+      <strong>نقشه دریایی</strong>
+
+      <small>OpenStreetMap + AIS</small>
+
+    </div>
+
+    <button
+      id="closePanel"
+      class="close-btn"
+      aria-label="بستن">
+      ×
+    </button>
+
+  </div>
+
+  <div class="panel-body">
+
+    <!-- AIS -->
+
+    <div class="status-card">
+
+      <div class="status-top">
+
+        <div>
+
+          <div class="status-label">
+            وضعیت AIS
+          </div>
+
+          <div id="statusText" class="status-value">
+            آماده
+          </div>
+
+        </div>
+
+        <div id="statusDot" class="status-dot"></div>
+
+      </div>
+
+      <button
+        class="fv"
+        id="retryBtn"
+        style="margin-top:10px">
+        🔄 تلاش مجدد اتصال
+      </button>
+
+      <small class="dl-note" id="swStatus">در حال بررسی حالت آفلاین...</small>
+
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #e3ecec">
+          <strong style="font-size:12px">🌍 دانلود منطقه‌ای (بدون نیاز به زوم)</strong>
+          <div class="route-actions" style="grid-template-columns:1fr;margin-top:7px">
+            <button class="route-action" data-region="gulf">🌊 خلیج فارس و دریای عمان <small id="rgGulf"></small></button>
+            <button class="route-action secondary" data-region="asia">🌏 آسیا <small id="rgAsia"></small></button>
+            <button class="route-action secondary" data-region="africa">🌍 آفریقا <small id="rgAfrica"></small></button>
+          </div>
+          <small class="dl-note">آسیا و آفریقا فقط در زوم کم (نمای کلی) دانلود می‌شوند و حجم کمی دارند. برای جزئیات، خلیج فارس را بگیرید و بعد روی بندرها زوم کنید و دانلود معمولی بزنید.</small>
+        </div>
+
+    </div>
+
+    <!-- آمار -->
+
+    <div class="stats">
+
+      <div class="stat">
+        <span>کشتی‌ها</span>
+        <strong id="shipCount">۰</strong>
+      </div>
+
+      <div class="stat">
+        <span>نمایش</span>
+        <strong id="visibleCount">۰</strong>
+      </div>
+
+      <div class="stat">
+        <span>سرعت میانگین</span>
+        <strong id="avgSpeed">—</strong>
+      </div>
+
+      <div class="stat">
+        <span>آخرین بروزرسانی</span>
+        <strong id="lastUpdate">—</strong>
+      </div>
+
+    </div>
+
+    <!-- =========================
+         مسیریابی آفلاین
+    ========================= -->
+    <div class="section" id="routeSection">
+      <div class="section-title"><span>🧭 مسیریابی آفلاین</span><small>GPS + نقشه ذخیره‌شده</small></div>
+      <div class="route-card">
+        <label class="route-label">مبدأ</label>
+        <select id="routeOrigin" class="route-select"><option value="gps">📍 موقعیت GPS من</option></select>
+        <button id="routeLocate" class="route-map-pick">📍 دریافت موقعیت من</button>
+        <div id="routeMyPos" class="route-result" style="margin-top:8px">موقعیت شما هنوز دریافت نشده است.</div>
+        <label class="route-label" style="margin-top:9px">مقصد</label>
+        <select id="routeDestination" class="route-select"><option value="">انتخاب بندر...</option></select>
+        <button id="routeMapPick" class="route-map-pick">📍 انتخاب مقصد روی نقشه</button>
+        <label class="route-label" style="margin-top:9px">سرعت فرضی (گره)</label>
+        <input id="routeSpeed" class="route-select" type="number" min="1" max="40" step="0.5" value="12" inputmode="decimal">
+        <div class="route-actions">
+          <button id="routeCalculate" class="route-action">🧭 محاسبه مسیر آفلاین</button>
+          <button id="routeClear" class="route-action danger">🧹 پاک کردن مسیر</button>
+        </div>
+        <div id="routeResult" class="route-result">ابتدا موقعیت خودتان و سپس مقصد را انتخاب کنید.</div>
+        <small class="route-note">این مسیریابی برای محاسبه مسیر از اینترنت، AIS یا API آنلاین استفاده نمی‌کند؛ مبدأ می‌تواند GPS گوشی یا یکی از بنادر باشد و مسیر با شبکه‌ی داخلی صفحه محاسبه می‌شود. برای نمایش نقشه در حالت بدون اینترنت، محدوده موردنظر را قبلاً از بخش «نقشه آفلاین» دانلود کنید.</small>
+      </div>
+    </div>
+
+    <!-- =========================
+         صیادی و دریانوردی
+    ========================= -->
+    <div class="section" id="fishSection">
+      <div class="section-title"><span>🎣 صیادی و دریانوردی</span><small>ابزارهای آفلاین</small></div>
+
+      <div class="route-card">
+        <label class="route-label">🛰️ ردیابی زنده و ثبت مسیر</label>
+        <button id="trackBtn" class="route-map-pick" style="margin-top:0">▶ شروع ردیابی</button>
+        <div id="trackInfo" class="route-result">ردیابی خاموش است.</div>
+        <div class="route-actions">
+          <button id="trackGpx" class="route-action secondary">⬇ خروجی GPX</button>
+          <button id="trackClear" class="route-action danger">🧹 پاک کردن مسیر</button>
+        </div>
+      </div>
+
+      <div class="route-card" style="margin-top:10px">
+        <label class="route-label">⚓ هشدار لنگر (رانش قایق)</label>
+        <input id="anchorRadius" class="route-select" type="number" min="20" max="1000" step="10" value="80" inputmode="numeric">
+        <small class="route-note" style="margin:-4px 0 7px">شعاع مجاز به متر</small>
+        <button id="anchorBtn" class="route-map-pick" style="margin-top:0">⚓ ثبت لنگر و فعال‌سازی هشدار</button>
+        <div id="anchorInfo" class="route-result">هشدار لنگر خاموش است.</div>
+      </div>
+
+      <div class="route-card" style="margin-top:10px">
+        <label class="route-label">📌 نقاط صید و علامت‌ها</label>
+        <div class="route-actions">
+          <button id="spotHere" class="route-action">📌 ذخیره‌ی موقعیت من</button>
+          <button id="spotCenter" class="route-action secondary">🎯 ذخیره‌ی مرکز نقشه</button>
+        </div>
+        <div id="spotList" style="margin-top:8px"></div>
+        <div class="route-actions" style="grid-template-columns:1fr 1fr;margin-top:8px">
+          <button id="spotJson" class="route-action secondary">⬇ JSON</button>
+          <button id="spotGpx" class="route-action secondary">⬇ GPX</button>
+        </div>
+        <button id="spotImport" class="route-map-pick">⬆ ورود نقاط از فایل JSON</button>
+        <input id="spotFile" type="file" accept=".json,application/json" style="display:none">
+        <small class="route-note">روی نقشه لمس طولانی (یا یک لمس ساده) کنید تا نقطه ذخیره شود، مسیر بگیرید یا وضعیت دریا را ببینید. نقاط فقط روی همین دستگاه ذخیره می‌شوند؛ برای نگهداری، خروجی بگیرید.</small>
+      </div>
+
+      <div class="route-card" style="margin-top:10px">
+        <label class="route-label">🌙 ماه و ساعت‌های صید · 🌬️ وضعیت دریا</label>
+        <div class="route-actions">
+          <button id="sunMoonBtn" class="route-action">🌙 ماه و ساعت صید</button>
+          <button id="seaBtn" class="route-action secondary">🌬️ وضعیت دریا</button>
+        </div>
+        <small class="route-note">برای مرکز نقشه محاسبه می‌شود؛ برای نقطه‌ی دیگر روی نقشه بزنید. ماه و ساعت‌ها آفلاین محاسبه می‌شوند؛ وضعیت دریا اینترنت می‌خواهد.</small>
+      </div>
+    </div>
+
+    <!-- فیلتر -->
+
+    <div class="section">
+
+      <div class="section-title">
+
+        <span>فیلتر کشتی‌ها</span>
+
+        <small id="filterLabel">انتخاب کنید</small>
+
+      </div>
+
+      <div class="filters">
+
+        <button class="filter" data-filter="all">
+          🚢 همه
+        </button>
+
+        <button class="filter" data-filter="cargo">
+          📦 باربری
+        </button>
+
+        <button class="filter" data-filter="tanker">
+          🛢️ نفتکش
+        </button>
+
+        <button class="filter" data-filter="passenger">
+          🛳️ مسافری
+        </button>
+
+        <button class="filter" data-filter="other">
+          ⚓ سایر
+        </button>
+
+        <button class="filter" data-filter="fav">
+          ⭐ علاقه‌مندی
+        </button>
+
+      </div>
+
+    </div>
+
+    <!-- بنادر -->
+
+    <div class="section">
+
+      <div class="section-title">
+
+        <span>بنادر</span>
+
+        <small>خلیج فارس و عمان</small>
+
+      </div>
+
+      <div class="ports" id="portList"></div>
+
+    </div>
+
+    <!-- آفلاین -->
+
+    <div class="section">
+
+      <div class="section-title">
+
+        <span>نقشه آفلاین</span>
+
+        <small id="dlStored">۰ کاشی ذخیره‌شده</small>
+
+      </div>
+
+      <div class="setting" style="display:block">
+
+        <div class="setting-text">
+
+          <strong>دانلود محدوده‌ی فعلی</strong>
+
+          <small id="dlInfo">—</small>
+
+        </div>
+
+        <div class="dl-bar">
+          <i id="dlBar"></i>
+        </div>
+
+        <div class="dl-row">
+
+          <button class="fv" id="dlBtn">
+            دانلود
+          </button>
+
+          <button class="fv dl-clr" id="dlClr">
+            پاک کردن
+          </button>
+
+        </div>
+
+        <small class="dl-note">
+
+          طبق قوانین OpenStreetMap فقط محدوده‌ی کوچک
+          دانلود می‌شود. بعد از دانلود، آن محدوده
+          بدون اینترنت باز می‌شود.
+
+        </small>
+
+      </div>
+
+    </div>
+
+    <!-- تنظیمات -->
+
+    <div class="section">
+
+      <div class="section-title">
+        <span>نمایش</span>
+      </div>
+
+      <div class="setting">
+
+        <div class="setting-text">
+
+          <strong>مسیر کشتی</strong>
+
+          <small>
+            نمایش مسیر حرکت اخیر
+          </small>
+
+        </div>
+
+        <button
+          class="switch on"
+          id="trailSwitch"
+          aria-label="مسیر کشتی">
+        </button>
+
+      </div>
+
+      <div class="setting">
+
+        <div class="setting-text">
+
+          <strong>فقط کشتی‌های فعال</strong>
+
+          <small>
+            پیام در ۵ دقیقه‌ی اخیر
+          </small>
+
+        </div>
+
+        <button
+          class="switch"
+          id="activeSwitch"
+          aria-label="فقط فعال‌ها">
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</aside>
+
+<script src="leaflet/leaflet.js"></script>
+<script>
+/* Leaflet: ۱) پوشه‌ی leaflet کنار فایل  ۲) نسخه‌ی ذخیره‌شده در حافظه‌ی مرورگر  ۳) اینترنت */
+(function(){
+  function inject(js){
+    var s=document.createElement("script");
+    s.textContent=js;
+    document.head.appendChild(s);
+  }
+  if(!window.L){
+    try{
+      var js=localStorage.getItem("marine_leaflet_js");
+      if(js) inject(js);
+    }catch(e){}
+  }
+  if(!window.L&&navigator.onLine){
+    document.write('<script src="'+LF_JS[0]+'"><\/script>');
+  }
+})();
+</script>
+<script>if(!window.L&&navigator.onLine) document.write('<script src="'+LF_JS[1]+'"><\/script>');</script>
+<script>if(!window.L&&navigator.onLine) document.write('<script src="'+LF_JS[2]+'"><\/script>');</script>
+<script>
+if(!window.L){
+  document.body.insertAdjacentHTML("beforeend",'<div style="position:fixed;inset:0;z-index:9999;background:#fff;display:grid;place-items:center;padding:24px;text-align:center;line-height:2.1;font-size:14px;direction:rtl">Leaflet پیدا نشد.<br>یک بار صفحه را با اینترنت باز کنید تا خودش Leaflet را روی گوشی ذخیره کند،<br>یا پوشه‌ی <b dir="ltr">leaflet</b> (شامل leaflet.js و leaflet.css) را کنار این فایل بگذارید.</div>');
+  throw new Error("Leaflet not found");
+}
+(function(){
+  /* اگر استایل Leaflet بارگذاری نشده بود (آفلاین)، نسخه‌ی ذخیره‌شده را اعمال کن */
+  try{
+    var t=document.createElement("div");
+    t.className="leaflet-pane";
+    t.style.visibility="hidden";
+    document.body.appendChild(t);
+    var ok=getComputedStyle(t).position==="absolute";
+    t.remove();
+    if(!ok){
+      var css=localStorage.getItem("marine_leaflet_css");
+      if(css){
+        var st=document.createElement("style");
+        st.textContent=css;
+        document.head.appendChild(st);
+      }
+    }
+  }catch(e){}
+  /* با اینترنت: یک نسخه‌ی Leaflet روی گوشی ذخیره کن تا دفعه‌ی بعد بدون اینترنت کار کند */
+  function save(key,urls,i){
+    i=i||0;
+    try{ if(localStorage.getItem(key)) return; }catch(e){ return; }
+    if(i>=urls.length) return;
+    fetch(urls[i]).then(function(r){ return r.ok?r.text():Promise.reject(); })
+      .then(function(t){ if(t.length>1000) localStorage.setItem(key,t); else throw 0; })
+      .catch(function(){ save(key,urls,i+1); });
+  }
+  if(navigator.onLine){
+    save("marine_leaflet_js",LF_JS);
+    save("marine_leaflet_css",LF_CSS);
+  }
+})();
+</script>
+
+<script>
+
+/* =========================
+   خطایابی
+========================= */
+
+window.addEventListener(
+  "error",
+  e=>{
+    console.error(
+      "Marine Map Error:",
+      e.error || e.message
+    );
+  }
+);
+
+window.addEventListener(
+  "unhandledrejection",
+  e=>{
+    console.error(
+      "Marine Map Promise Error:",
+      e.reason
+    );
+  }
+);
+
+/* =========================
+   HELPERS
+========================= */
+
+const $ =
+  id=>document.getElementById(id);
+
+const fa =
+  n=>Number(n).toLocaleString("fa-IR");
+
+const esc =
+  v=>String(v??"").replace(
+    /[&<>"']/g,
+    c=>({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#39;"
+    }[c])
+  );
+
+const num =
+  v=>{
+    const n=Number(v);
+    return Number.isFinite(n)?n:NaN;
+  };
+
+function toast(t){
+
+  const e=$("toast");
+
+  e.textContent=t;
+  e.style.display="block";
+
+  clearTimeout(toast.t);
+
+  toast.t=
+    setTimeout(
+      ()=>{
+        e.style.display="none";
+      },
+      2400
+    );
+
+}
+
+/* =========================
+   MAP
+========================= */
+
+const map=
+  L.map(
+    "map",
+    {
+      preferCanvas:true,
+      minZoom:3,
+      maxZoom:19,
+      worldCopyJump:true,
+      zoomControl:true
+    }
+  ).setView(
+    [27.15,55.95],
+    7
+  );
+
+const TILE_URL=
+  "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+/* =========================
+   INDEXED DB
+========================= */
+
+const dbp=
+  new Promise(res=>{
+
+    try{
+
+      const r=
+        indexedDB.open(
+          "marine_tiles",
+          1
+        );
+
+      r.onupgradeneeded=()=>{
+
+        if(
+          !r.result.objectStoreNames.contains("t")
+        ){
+
+          r.result.createObjectStore("t");
+
+        }
+
+      };
+
+      r.onsuccess=()=>{
+        res(r.result);
+      };
+
+      r.onerror=()=>{
+        res(null);
+      };
+
+    }catch(_){
+
+      res(null);
+
+    }
+
+  });
+
+const idb=
+  (mode,fn)=>
+    dbp.then(
+      db=>{
+
+        if(!db)
+          return null;
+
+        return new Promise(
+          res=>{
+
+            try{
+
+              const tx=
+                db.transaction(
+                  "t",
+                  mode
+                );
+
+              const rq=
+                fn(
+                  tx.objectStore("t")
+                );
+
+              tx.oncomplete=()=>{
+                res(
+                  rq &&
+                  rq.result
+                );
+              };
+
+              tx.onerror=
+              tx.onabort=()=>{
+                res(null);
+              };
+
+            }catch(_){
+
+              res(null);
+
+            }
+
+          }
+        );
+
+      }
+    );
+
+const tGet=
+  k=>
+    idb(
+      "readonly",
+      s=>s.get(k)
+    );
+
+const tPut=
+  (k,b)=>
+    idb(
+      "readwrite",
+      s=>s.put(b,k)
+    );
+
+const tHas=
+  k=>
+    idb(
+      "readonly",
+      s=>s.count(k)
+    ).then(
+      n=>n>0
+    );
+
+const tCount=
+  ()=>
+    idb(
+      "readonly",
+      s=>s.count()
+    );
+
+const tClear=
+  ()=>
+    idb(
+      "readwrite",
+      s=>s.clear()
+    );
+
+/* =========================
+   OFFLINE TILE LAYER
+========================= */
+
+const OfflineLayer=
+  L.TileLayer.extend({
+
+    createTile(c,done){
+
+      const img=
+        document.createElement("img");
+
+      img.alt="";
+      img.setAttribute(
+        "role",
+        "presentation"
+      );
+
+      const url=
+        this.getTileUrl(c);
+
+      img.onload=()=>{
+        done(null,img);
+      };
+
+      img.onerror=
+        e=>{
+          done(e,img);
+        };
+
+      tGet(url).then(
+        b=>{
+
+          if(b){
+
+            img.onload=()=>{
+
+              done(
+                null,
+                img
+              );
+
+              try{
+
+                URL.revokeObjectURL(
+                  img.src
+                );
+
+              }catch(_){}
+
+            };
+
+            img.src=
+              URL.createObjectURL(b);
+
+          }else{
+
+            img.src=url;
+
+          }
+
+        }
+      );
+
+      return img;
+
+    }
+
+  });
+
+new OfflineLayer(
+  TILE_URL,
+  {
+    maxZoom:19,
+
+    className:"base-tiles",
+    attribution:
+      '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+  }
+).addTo(map);
+
+setTimeout(
+  ()=>{
+    map.invalidateSize(true);
+  },
+  300
+);
+
+window.addEventListener(
+  "resize",
+  ()=>{
+    setTimeout(
+      ()=>{
+        map.invalidateSize(true);
+      },
+      100
+    );
+  }
+);
+
+/* =========================
+   PORTS
+========================= */
+
+const ports=[
+
+  [
+    "بندرعباس",
+    "Hormozgan · Iran",
+    "⚓",
+    27.1832,
+    56.2666,
+    12
+  ],
+
+  [
+    "بندر شهید رجایی",
+    "Shahid Rajaee Port",
+    "🚢",
+    27.1027,
+    56.0680,
+    13
+  ],
+
+  [
+    "بندر شهید باهنر",
+    "Shahid Bahonar Port",
+    "⚓",
+    27.136,
+    56.342,
+    13
+  ],
+
+  [
+    "قشم",
+    "Qeshm Island",
+    "🏝️",
+    26.9581,
+    56.2710,
+    12
+  ],
+
+  [
+    "جزیره هرمز",
+    "Hormuz Island",
+    "🏝️",
+    27.0927,
+    56.4541,
+    13
+  ],
+
+  [
+    "کیش",
+    "Kish Island",
+    "⚓",
+    26.5320,
+    53.9750,
+    12
+  ],
+
+  [
+    "بندر لنگه",
+    "Bandar Lengeh",
+    "⚓",
+    26.5580,
+    54.8800,
+    12
+  ],
+
+  [
+    "چابهار",
+    "Chabahar Port",
+    "⚓",
+    25.2919,
+    60.6430,
+    11
+  ]
+
+];
+
+$("portList").innerHTML=
+  ports.map(
+    (p,i)=>`
+
+      <button
+        class="port"
+        data-i="${i}">
+
+        <div class="port-icon">
+          ${p[2]}
+        </div>
+
+        <div class="port-text">
+
+          <strong>
+            ${p[0]}
+          </strong>
+
+          <small>
+            ${p[1]}
+          </small>
+
+        </div>
+
+      </button>
+
+    `
+  ).join("");
+
+$("portList").addEventListener(
+  "click",
+  e=>{
+
+    const b=
+      e.target.closest(".port");
+
+    if(!b)
+      return;
+
+    const p=
+      ports[b.dataset.i];
+
+    map.flyTo(
+      [p[3],p[4]],
+      p[5],
+      {duration:1.1}
+    );
+
+    closePanel();
+
+  }
+);
+
+/* =========================
+   SHIPS DATA
+========================= */
+
+const ships=new Map();
+const markers=new Map();
+const trails=new Map();
+
+let currentFilter="none";
+let showTrails=true;
+let onlyActive=false;
+let dirty=false;
+let demoTimer=null;
+let gotReal=false;
+
+const STALE=
+  10*60*1000;
+
+const ACTIVE=
+  5*60*1000;
+
+/* =========================
+   SHIP CATEGORY
+========================= */
+
+function category(v){
+  const n=Number(v);
+  if(Number.isFinite(n)&&String(v).trim()!==""){
+    return n>=70&&n<=79?"cargo":n>=80&&n<=89?"tanker":n>=60&&n<=69?"passenger":"other";
+  }
+  const t=String(v??"").toLowerCase();
+  if(/cargo|freight/.test(t)) return "cargo";
+  if(/tanker|oil|chemical/.test(t)) return "tanker";
+  if(/passenger|ferry/.test(t)) return "passenger";
+  return "other";
+}
+
+const label={
+  cargo:"باربری",
+  tanker:"نفتکش",
+  passenger:"مسافری",
+  other:"سایر"
+};
+
+/* =========================
+   FAVORITES
+========================= */
+
+let favs=new Set();
+
+try{
+
+  favs=
+    new Set(
+      JSON.parse(
+        localStorage.getItem(
+          "marine_favorites"
+        )||"[]"
+      )
+    );
+
+}catch(_){}
+
+function toggleFav(id){
+
+  favs.has(id)
+    ?favs.delete(id)
+    :favs.add(id);
+
+  try{
+
+    localStorage.setItem(
+      "marine_favorites",
+      JSON.stringify(
+        [...favs]
+      )
+    );
+
+  }catch(_){}
+
+  toast(
+    favs.has(id)
+      ?"به علاقه‌مندی‌ها اضافه شد"
+      :"از علاقه‌مندی‌ها حذف شد"
+  );
+
+  render();
+
+}
+
+/* =========================
+   UPSERT
+========================= */
+
+function upsert(s){
+
+  const old=
+    ships.get(s.mmsi);
+
+  const now=
+    Date.now();
+
+  const history=
+    old
+      ?old.history
+      :[];
+
+  if(
+    !old ||
+    old.lat!==s.lat ||
+    old.lon!==s.lon
+  ){
+
+    history.push(
+      [s.lat,s.lon]
+    );
+
+    if(history.length>60)
+      history.shift();
+
+  }
+
+  const hd=
+    Number.isFinite(s.heading)
+      ?s.heading
+
+      :Number.isFinite(s.cog)
+        ?s.cog
+
+        :(old?old.hd:0);
+
+  ships.set(
+    s.mmsi,
+    {
+
+      ...s,
+
+      name:
+        s.name &&
+        s.name!=="کشتی بدون نام"
+
+          ?s.name
+
+          :(old&&old.name) ||
+           "کشتی بدون نام",
+
+      type:
+        s.type!=="other" ||
+        !old
+          ?s.type
+          :old.type,
+
+      hd,
+      history,
+      updated:now,
+
+      dlat:
+        old
+          ?old.dlat
+          :s.lat,
+
+      dlon:
+        old
+          ?old.dlon
+          :s.lon,
+
+      dhd:
+        old
+          ?old.dhd
+          :hd,
+
+      flat:
+        old
+          ?old.dlat
+          :s.lat,
+
+      flon:
+        old
+          ?old.dlon
+          :s.lon,
+
+      fhd:
+        old
+          ?old.dhd
+          :hd,
+
+      t0:performance.now(),
+
+      dur:
+        Math.min(
+          5000,
+          Math.max(
+            1000,
+            old
+              ?now-old.updated
+              :0
+          )
+        ),
+
+      k:
+        old
+          ?0
+          :1,
+
+      dir:null
+
+    }
+  );
+
+  dirty=true;
+
+  
+
+}
+
+/* =========================
+   REMOVE
+========================= */
+
+function removeShip(id){
+
+  const m=
+    markers.get(id);
+
+  if(m)
+    map.removeLayer(m);
+
+  markers.delete(id);
+
+  const t=
+    trails.get(id);
+
+  if(t)
+    map.removeLayer(t);
+
+  trails.delete(id);
+
+  ships.delete(id);
+
+}
+
+/* =========================================================
+   MARINE ROUTING
+========================================================= */
+
+let routeLayer=null;
+let routeDestinationMarker=null;
+let routePickMode=false;
+let routeEngine=null;
+
+const routeState={
+  destination:null
+};
+
+function routeResultHTML(html){
+
+  $("routeResult").innerHTML=html;
+
+}
+
+function formatHours(h){
+
+  if(!Number.isFinite(h))
+    return "—";
+
+  if(h<1)
+    return fa(Math.round(h*60))+" دقیقه";
+
+  const days=Math.floor(h/24);
+  const hours=Math.round(h%24);
+
+  if(days>0)
+    return fa(days)+" روز و "+fa(hours)+" ساعت";
+
+  return fa(hours)+" ساعت";
+
+}
+
+function formatNm(v){
+
+  if(!Number.isFinite(v))
+    return "—";
+
+  return fa(v.toFixed(1))+" مایل دریایی";
+
+}
+
+function updateRouteShipList(){
+  /* مسیریابی فقط از موقعیت GPS کاربر استفاده می‌کند؛ AIS در مبدأ مسیر استفاده نمی‌شود. */
+}
+
+function updateRouteDestinationList(){
+  const og=$("routeOrigin");
+  if(og) og.innerHTML=`<option value="gps">📍 موقعیت GPS من</option>`+ports.map((p,i)=>`<option value="${i}">⚓ ${esc(p[0])}</option>`).join("");
+  const sel=$("routeDestination");
+  if(!sel) return;
+  sel.innerHTML=`<option value="">انتخاب بندر...</option>`+ports.map((p,i)=>`<option value="${i}">${esc(p[0])}</option>`).join("");
+}
+
+function setRouteDestination(
+  lat,
+  lon,
+  name,
+  fly=false
+){
+
+  routeState.destination={
+    lat:Number(lat),
+    lon:Number(lon),
+    name:
+      name ||
+      "نقطه انتخابی"
+  };
+
+  $("routeDestination").value="";
+
+  if(routeDestinationMarker)
+    map.removeLayer(
+      routeDestinationMarker
+    );
+
+  routeDestinationMarker=
+    L.marker(
+      [
+        routeState.destination.lat,
+        routeState.destination.lon
+      ],
+      {
+        icon:
+          L.divIcon({
+            className:"",
+            html:
+              `<div class="route-destination-marker">🎯</div>`,
+            iconSize:[30,30],
+            iconAnchor:[15,15]
+          })
+      }
+    )
+    .addTo(map)
+    .bindPopup(
+      `
+        <b>🎯 مقصد مسیر</b>
+        <br>
+        ${esc(routeState.destination.name)}
+      `
+    );
+
+  if(fly){
+
+    map.flyTo(
+      [
+        routeState.destination.lat,
+        routeState.destination.lon
+      ],
+      Math.max(
+        map.getZoom(),
+        10
+      ),
+      {
+        duration:.8
+      }
+    );
+
+  }
+
+  routeResultHTML(`
+
+    🎯 مقصد انتخاب شد:
+
+    <strong>
+      ${esc(routeState.destination.name)}
+    </strong>
+
+    <br>
+
+    حالا روی
+    «محاسبه مسیر آفلاین»
+    بزنید.
+
+  `);
+
+}
+
+function clearRoute(){
+
+  if(routeLayer){
+
+    map.removeLayer(
+      routeLayer
+    );
+
+    routeLayer=null;
+
+  }
+
+  if(routeDestinationMarker){
+
+    map.removeLayer(
+      routeDestinationMarker
+    );
+
+    routeDestinationMarker=null;
+
+  }
+
+  routeState.destination=null;
+
+  routePickMode=false;
+
+  $("routeMapPick")
+    .classList.remove(
+      "active"
+    );
+
+  $("routeMapPick").textContent="📍 انتخاب مقصد روی نقشه";
+  $("routeDestination").value="";
+
+  routeResultHTML(
+    "ابتدا مبدأ و سپس مقصد را انتخاب کنید."
+  );
+
+}
+
+/* ---------- موقعیت کاربر (درخواست دسترسی به GPS) ---------- */
+let myPos=null, myMarker=null, myAcc=null;
+function geoMsg(e){
+  const c=e&&e.code;
+  return c===1?"دسترسی به موقعیت مکانی رد شد. از تنظیمات مرورگر (آیکن کنار آدرس ← تنظیمات سایت ← Location) آن را روی «اجازه» بگذارید و دوباره بزنید. موقعیت فقط روی صفحه‌ی https کار می‌کند."
+    :c===2?"موقعیت در دسترس نیست؛ GPS گوشی را روشن کنید."
+    :c===3?"زمان دریافت موقعیت تمام شد؛ دوباره امتحان کنید."
+    :"مرورگر شما موقعیت مکانی را پشتیبانی نمی‌کند.";
+}
+function setMyPosition(lat,lon,acc,fly){
+  myPos={lat,lon,acc,t:Date.now()};
+  if(myMarker) map.removeLayer(myMarker);
+  if(myAcc) map.removeLayer(myAcc);
+  myAcc=L.circle([lat,lon],{radius:Math.min(acc||0,5000),color:"#0f766e",weight:1,fillOpacity:.1,interactive:false}).addTo(map);
+  myMarker=L.circleMarker([lat,lon],{radius:8,color:"#fff",weight:3,fillColor:"#0f766e",fillOpacity:1}).addTo(map).bindPopup("📍 موقعیت فعلی شما");
+  if(fly) map.flyTo([lat,lon],Math.max(map.getZoom(),11),{duration:1.1});
+}
+function requestMyLocation(fresh){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation) return reject({code:0});
+    if(!fresh&&myPos&&Date.now()-myPos.t<60000) return resolve(myPos);
+    toast("در حال دریافت موقعیت... اگر پرسید، اجازه دهید");
+    navigator.geolocation.getCurrentPosition(
+      p=>{ setMyPosition(p.coords.latitude,p.coords.longitude,p.coords.accuracy,fresh); resolve(myPos); },
+      e=>reject(e),
+      {enableHighAccuracy:true,timeout:15000,maximumAge:30000}
+    );
+  });
+}
+
+/* ---------- مسیریابی دریایی v2: شبکه‌ی متراکم‌تر + A* ---------- */
+const SEA_NODES={
+  /* کریدور اصلی خلیج فارس */
+  G10:[28.45,50.35],G9:[27.80,51.30],G8:[27.00,52.40],G7:[26.55,53.30],G6:[26.30,54.10],
+  G5:[26.38,54.85],G4:[26.40,55.30],G3:[26.45,55.70],G2:[26.58,56.20],G1:[26.55,56.45],
+  GE:[26.32,56.85],O1:[26.00,57.15],
+  /* کریدور جنوبی */
+  C1:[25.45,57.80],C2:[25.25,59.00],C3:[25.12,60.00],CHB:[25.20,60.63],
+  /* اطراف قشم، هرمز و بندرعباس */
+  QW:[26.92,56.02],Q0:[26.91,56.16],Q1:[26.93,56.27],Q2:[26.95,56.39],
+  HZ1:[27.00,56.46],HZ2:[27.08,56.47],HZ3:[27.15,56.45],
+  B0:[26.99,56.50],B1:[27.04,56.30],BA:[27.10,56.27],BHN:[27.11,56.34],
+  R1:[27.07,56.15],R2:[27.06,56.07],R3:[27.05,55.98],
+  /* کریدور کیش ـ لنگه */
+  K0:[26.47,53.88],K1:[26.47,54.00],LNG:[26.48,54.88],
+  L1:[26.50,55.02],L2:[26.48,55.22],L3:[26.48,55.45],
+  /* جنوب عمان/چابهار */
+  M1:[25.85,57.45],M2:[25.55,58.10],M3:[25.35,59.10],M4:[25.20,60.15]
+};
+
+const SEA_EDGES=[
+  ["G10","G9"],["G9","G8"],["G8","G7"],["G7","G6"],["G6","G5"],["G5","G4"],["G4","G3"],["G3","G2"],["G2","G1"],["G1","GE"],["GE","O1"],
+  ["O1","C1"],["C1","C2"],["C2","C3"],["C3","CHB"],
+  ["G7","K0"],["K0","K1"],["K1","G6"],["G6","LNG"],["LNG","L1"],["L1","L2"],["L2","L3"],["L3","G3"],
+  ["GE","QW"],["QW","Q0"],["Q0","Q1"],["Q1","Q2"],["Q2","HZ1"],["HZ1","HZ2"],["HZ2","HZ3"],
+  ["Q2","B0"],["B0","B1"],["B1","BA"],["BA","BHN"],["BA","R1"],["R1","R2"],["R2","R3"],
+  ["G1","B0"],["G2","QW"],["G3","R3"],
+  ["O1","M1"],["M1","M2"],["M2","M3"],["M3","M4"],["M4","CHB"]
+];
+
+const seaKm=(a,b,c,d)=>{
+  const r=Math.PI/180;
+  const p=(c-a)*r;
+  const q=(d-b)*r*Math.cos((a+c)*r/2);
+  return 6371*Math.hypot(p,q);
+};
+
+function seaPlan(o,d){
+  const ids=Object.keys(SEA_NODES);
+  const adj={};
+  ids.forEach(i=>adj[i]=[]);
+  SEA_EDGES.forEach(([a,b])=>{
+    const w=seaKm(...SEA_NODES[a],...SEA_NODES[b]);
+    adj[a].push([b,w]);
+    adj[b].push([a,w]);
+  });
+
+  /* فقط نزدیک‌ترین چند گره به مبدأ/مقصد وصل می‌شوند؛ این کار از پرش‌های عجیب جلوگیری می‌کند. */
+  const near=p=>ids
+    .map(i=>[i,seaKm(p.lat,p.lon,...SEA_NODES[i])])
+    .sort((a,b)=>a[1]-b[1])
+    .slice(0,4);
+
+  const no=near(o), nd=near(d);
+  if(no[0][1]>55 || nd[0][1]>55)
+    return {ok:false,why:"out"};
+
+  const nodes=[...ids,"S","E"];
+  adj.S=[]; adj.E=[];
+  no.forEach(([i,w])=>adj.S.push([i,w]));
+  nd.forEach(([i,w])=>adj[i].push(["E",w]));
+
+  /* A*: سریع‌تر از Dijkstra و مناسب شبکه‌ی دریایی کوچک */
+  const g={S:0}, f={S:seaKm(o.lat,o.lon,d.lat,d.lon)}, prev={};
+  const open=new Set(["S"]);
+  const h=k=>k==="S"?seaKm(o.lat,o.lon,d.lat,d.lon):k==="E"?0:seaKm(...SEA_NODES[k],d.lat,d.lon);
+
+  while(open.size){
+    let u=null;
+    for(const k of open) if(u===null || (f[k]??Infinity)<(f[u]??Infinity)) u=k;
+    if(u==="E") break;
+    open.delete(u);
+    for(const [v,w] of adj[u]||[]){
+      const ng=(g[u]??Infinity)+w;
+      if(ng<(g[v]??Infinity)){
+        g[v]=ng;
+        f[v]=ng+h(v);
+        prev[v]=u;
+        open.add(v);
+      }
+    }
+  }
+
+  if(!Number.isFinite(g.E)) return {ok:false,why:"none"};
+  const seq=[];
+  for(let k="E";k;k=prev[k]) seq.unshift(k);
+  const pt=k=>k==="S"?[o.lat,o.lon]:k==="E"?[d.lat,d.lon]:SEA_NODES[k];
+  const path=seq.map(pt);
+  const nodesPath=seq.filter(k=>k!=="S"&&k!=="E");
+  return {
+    ok:true,
+    path,
+    nodes:nodesPath,
+    km:g.E,
+    leg1:seaKm(o.lat,o.lon,...path[1]),
+    leg2:seaKm(...path[path.length-2],d.lat,d.lon)
+  };
+}
+
+function routeBearing(a,b){
+  const r=Math.PI/180;
+  const y=Math.sin((b[1]-a[1])*r)*Math.cos(b[0]*r);
+  const x=Math.cos(a[0]*r)*Math.sin(b[0]*r)-Math.sin(a[0]*r)*Math.cos(b[0]*r)*Math.cos((b[1]-a[1])*r);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function bearingText(v){
+  const dirs=["شمال","شمال‌شرق","شرق","جنوب‌شرق","جنوب","جنوب‌غرب","غرب","شمال‌غرب"];
+  return dirs[Math.round(v/45)%8];
+}
+
+async function calculateRoute(){
+  let o;
+  const oi=$("routeOrigin")?$("routeOrigin").value:"gps";
+  if(oi!=="gps"&&ports[Number(oi)]){
+    const pp=ports[Number(oi)];
+    o={lat:pp[3],lon:pp[4],name:pp[0],sog:NaN};
+  }else{
+    let p;
+    try{ p=await requestMyLocation(true); }catch(e){ routeResultHTML(`<strong style="color:#b91c1c">❌ موقعیت دریافت نشد</strong><br><br>${esc(geoMsg(e))}<br><br>می‌توانید به‌جای GPS، یک بندر را به‌عنوان مبدأ انتخاب کنید.`); return; }
+    o={lat:p.lat,lon:p.lon,name:"موقعیت من",sog:NaN};
+  }
+  const dest=routeState.destination;
+  if(!dest) return toast("ابتدا مقصد را انتخاب کنید");
+  routeResultHTML("⏳ در حال محاسبه‌ی مسیر آفلاین...");
+  await new Promise(r=>requestAnimationFrame(r));
+  const r=seaPlan(o,dest);
+  if(!r.ok){ routeResultHTML(`<strong style="color:#b91c1c">❌ مسیر محاسبه نشد</strong><br><br>${r.why==="out"?"موقعیت یا مقصد بیش از ۵۵ کیلومتر از شبکه‌ی مسیر دریایی فاصله دارد؛ یک نقطه‌ی نزدیک‌تر روی آب انتخاب کنید.":"بین این دو نقطه در شبکه‌ی دریایی مسیر پیدا نشد."}`); return; }
+  if(routeLayer) map.removeLayer(routeLayer);
+  const g=L.layerGroup();
+  const solid={color:"#0f766e",weight:5,opacity:.92,lineCap:"round",lineJoin:"round",className:"route-line",interactive:false};
+  const dash={color:"#64748b",weight:2.5,dashArray:"5 8",opacity:.85,interactive:false};
+  L.polyline(r.path,solid).addTo(g);
+  L.polyline([r.path[0],r.path[1]],dash).addTo(g);
+  L.polyline([r.path[r.path.length-2],r.path[r.path.length-1]],dash).addTo(g);
+  r.nodes.forEach((k,i)=>L.circleMarker(SEA_NODES[k],{radius:4,weight:2,color:"#fff",fillColor:"#0f766e",fillOpacity:1,interactive:false}).bindTooltip(`نقطه مسیر ${fa(i+1)}`,{direction:"top",opacity:.9}).addTo(g));
+  routeLayer=g.addTo(map);
+  map.fitBounds(L.latLngBounds(r.path),{paddingTopLeft:[20,90],paddingBottomRight:[20,120],maxZoom:11});
+  const nm=r.km/1.852, sp=Math.max(1,Number($("routeSpeed").value)||12);
+  const bearing=routeBearing(r.path[Math.max(0,r.path.length-2)],r.path[r.path.length-1]);
+  const hormuz=r.nodes.some(k=>["GE","G1","G2","QW","Q0","Q1","Q2","HZ1","HZ2"].includes(k));
+  const warn=(r.leg1>15||r.leg2>15)?`<div style="margin-top:7px">⚠️ اتصال ${r.leg1>15?"مبدأ":"مقصد"} تا شبکه بیش از ۱۵ کیلومتر است؛ بخش خط‌چین فقط اتصال تقریبی است.</div>`:"";
+  routeResultHTML(`<strong>✅ مسیر آفلاین محاسبه شد</strong><div class="route-stats"><div class="route-stat"><span>مبدأ</span><strong>${esc(o.name==="موقعیت من"?"📍 موقعیت من":o.name)}</strong></div><div class="route-stat"><span>مقصد</span><strong>${esc(dest.name)}</strong></div><div class="route-stat"><span>فاصله مسیر</span><strong>${formatNm(nm)}<br><small>${fa(r.km.toFixed(1))} کیلومتر</small></strong></div><div class="route-stat"><span>سرعت فرضی</span><strong>${fa(sp.toFixed(1))} kn</strong></div><div class="route-stat"><span>ETA تقریبی</span><strong>${formatHours(nm/sp)}</strong></div><div class="route-stat"><span>جهت نهایی</span><strong>${fa(Math.round(bearing))}° · ${bearingText(bearing)}</strong></div></div>${hormuz?"<br>🚧 مسیر از محدوده‌ی تنگه هرمز عبور می‌کند.":""}${warn}<div style="margin-top:8px;font-size:11px;opacity:.78">📴 محاسبه مسیر کاملاً محلی است؛ اینترنت، AIS و API آنلاین استفاده نشد.</div>`);
+}
+
+$("routeLocate").addEventListener("click",()=>{ requestMyLocation(true).then(p=>{ const e=$("routeMyPos"); if(e)e.innerHTML=`📍 موقعیت شما ثبت شد<br><small>دقت تقریبی: ${fa(Math.round(p.acc||0))} متر</small>`; routeResultHTML("📍 موقعیت دریافت شد. حالا مقصد را انتخاب کنید."); }).catch(e=>routeResultHTML(`<strong style="color:#b91c1c">❌ موقعیت دریافت نشد</strong><br><br>${esc(geoMsg(e))}`)); });
+$("routeDestination").addEventListener("change",e=>{ const i=e.target.value; if(i==="")return; const p=ports[Number(i)]; if(p)setRouteDestination(p[3],p[4],p[0],true); });
+$("routeMapPick").addEventListener("click",()=>{ routePickMode=!routePickMode; $("routeMapPick").classList.toggle("active",routePickMode); $("routeMapPick").textContent=routePickMode?"🎯 روی نقشه مقصد را لمس کنید":"📍 انتخاب مقصد روی نقشه"; if(routePickMode)toast("حالا روی نقطه مقصد در نقشه بزنید"); });
+$("routeCalculate").addEventListener("click",calculateRoute);
+$("routeClear").addEventListener("click",clearRoute);
+
+/* =========================
+   POPUP
+========================= */
+
+function popupHTML(s){
+
+  const sp=
+    Number.isFinite(s.sog)
+      ?fa(
+        s.sog.toFixed(1)
+      )+" kn"
+      :"—";
+
+  const co=
+    Number.isFinite(s.cog)
+      ?fa(
+        Math.round(s.cog)
+      )+"°"
+      :"—";
+
+  return `
+
+    <div class="popup">
+
+      <h3>
+        🚢 ${esc(s.name)}
+      </h3>
+
+      <div class="popup-grid">
+
+        <div class="popup-item">
+
+          <span>نوع</span>
+
+          <strong>
+            ${label[s.type]}
+          </strong>
+
+        </div>
+
+        <div class="popup-item">
+
+          <span>MMSI</span>
+
+          <strong>
+            ${esc(s.mmsi)}
+          </strong>
+
+        </div>
+
+        <div class="popup-item">
+
+          <span>سرعت</span>
+
+          <strong>
+            ${sp}
+          </strong>
+
+        </div>
+
+        <div class="popup-item">
+
+          <span>مسیر حرکت</span>
+
+          <strong>
+            ${co}
+          </strong>
+
+        </div>
+
+      </div>
+
+      <button
+        class="fv"
+        onclick="toggleFav('${esc(s.mmsi)}')">
+
+        ${
+          favs.has(s.mmsi)
+            ?"★ حذف از علاقه‌مندی"
+            :"☆ افزودن به علاقه‌مندی"
+        }
+
+      </button>
+
+
+
+    </div>
+
+  `;
+
+}
+
+/* =========================
+   TRAIL COLOR
+========================= */
+
+const trailColor=
+  t=>
+    t==="tanker"
+      ?"#dc2626"
+
+      :t==="cargo"
+        ?"#2563eb"
+
+        :t==="passenger"
+          ?"#9333ea"
+
+          :"#0f766e";
+
+/* =========================
+   RENDER
+========================= */
+
+function render(){
+
+  dirty=false;
+
+  const now=
+    Date.now();
+
+  let visible=0;
+  let sum=0;
+  let cnt=0;
+  let newest=0;
+
+  for(
+    const [id,s]
+    of [...ships]
+  ){
+
+    if(
+      now-s.updated>STALE
+    ){
+
+      removeShip(id);
+      continue;
+
+    }
+
+    const active=
+      now-s.updated<ACTIVE;
+
+    if(
+      Number.isFinite(s.sog)
+    ){
+
+      sum+=s.sog;
+      cnt++;
+
+    }
+
+    if(
+      s.updated>newest
+    )
+      newest=s.updated;
+
+    const show=
+      (!onlyActive||active) &&
+      currentFilter!=="none" &&
+      (
+        currentFilter==="all" ||
+
+        (
+          currentFilter==="fav"
+            ?favs.has(id)
+            :s.type===currentFilter
+        )
+      );
+
+    let m=
+      markers.get(id);
+
+    if(!show){
+
+      if(m){
+
+        map.removeLayer(m);
+        markers.delete(id);
+
+      }
+
+      const t=
+        trails.get(id);
+
+      if(t){
+
+        map.removeLayer(t);
+        trails.delete(id);
+
+      }
+
+      continue;
+
+    }
+
+    visible++;
+
+    const cls=
+      `ship-marker ship-${s.type}`+
+      `${favs.has(id)?" fav":""}`+
+      `${active?"":" idle"}`;
+
+    if(!m){
+
+      s.dlat=s.lat;
+      s.dlon=s.lon;
+      s.dhd=s.hd;
+      s.k=1;
+
+      m=
+        L.marker(
+          [s.dlat,s.dlon],
+          {
+            icon:
+              L.divIcon(
+                {
+                  className:"hit",
+
+                  html:`
+
+                    <div class="${cls}">
+
+                      <i
+                        class="dir"
+                        style="
+                          transform:
+                            rotate(${s.dhd}deg)
+                        ">
+                      </i>
+
+                      🚢
+
+                    </div>
+
+                  `,
+
+                  iconSize:[30,30],
+
+                  iconAnchor:[15,15],
+
+                  popupAnchor:[0,-11]
+
+                }
+              )
+          }
+        ).addTo(map);
+
+      m.bindPopup(
+        ()=>popupHTML(
+          ships.get(id)||s
+        )
+      );
+
+      markers.set(
+        id,
+        m
+      );
+
+    }
+
+    const el=
+      m.getElement();
+
+    if(
+      el &&
+      el.firstChild
+    ){
+
+      el.firstChild.className=
+        cls;
+
+    }
+
+    if(
+      m.isPopupOpen()
+    ){
+
+      m.setPopupContent(
+        popupHTML(s)
+      );
+
+    }
+
+    let line=
+      trails.get(id);
+
+    if(
+      showTrails &&
+      s.history.length>1
+    ){
+
+      if(!line){
+
+        trails.set(
+          id,
+          L.polyline(
+            s.history,
+            {
+              color:
+                trailColor(s.type),
+
+              weight:2,
+
+              opacity:.45,
+
+              interactive:false
+            }
+          ).addTo(map)
+        );
+
+      }else{
+
+        line.setLatLngs(
+          s.history
+        );
+
+      }
+
+    }else if(line){
+
+      map.removeLayer(line);
+      trails.delete(id);
+
+    }
+
+  }
+
+  $("shipCount")
+    .textContent=
+      fa(ships.size);
+
+  $("visibleCount")
+    .textContent=
+      fa(visible);
+
+  $("avgSpeed")
+    .textContent=
+      cnt
+        ?fa(
+          (
+            sum/cnt
+          ).toFixed(1)
+        )+" kn"
+        :"—";
+
+  $("lastUpdate")
+    .textContent=
+      newest
+        ?new Date(
+          newest
+        ).toLocaleTimeString(
+          "fa-IR",
+          {
+            hour:"2-digit",
+            minute:"2-digit"
+          }
+        )
+        :"—";
+
+  updateRouteShipList();
+
+}
+
+/* =========================
+   RENDER LOOP
+========================= */
+
+setInterval(
+  ()=>{
+    if(dirty){
+
+      try{
+
+        render();
+
+      }catch(e){
+
+        console.error(e);
+
+        setStatus(
+          "خطای نمایش: "+e.message,
+          "error"
+        );
+
+      }
+
+    }
+  },
+  1000
+);
+
+setInterval(
+  ()=>{
+    dirty=true;
+  },
+  30000
+);
+
+/* =========================
+   SMOOTH SHIP MOVEMENT
+========================= */
+
+function frame(now){
+
+  try{
+    frameStep(now);
+  }catch(e){
+    console.error(e);
+  }
+
+  requestAnimationFrame(frame);
+
+}
+
+function frameStep(now){
+
+  for(
+    const [id,m]
+    of markers
+  ){
+
+    const s=
+      ships.get(id);
+
+    if(
+      !s ||
+      s.k>=1
+    )
+      continue;
+
+    const k=
+      Math.min(
+        1,
+        (
+          now-s.t0
+        )/s.dur
+      );
+
+    s.k=k;
+
+    s.dlat=
+      s.flat+
+      (
+        s.lat-s.flat
+      )*k;
+
+    s.dlon=
+      s.flon+
+      (
+        s.lon-s.flon
+      )*k;
+
+    s.dhd=
+      (
+        s.fhd+
+        (
+          (
+            (
+              s.hd-s.fhd+540
+            )%360
+          )-180
+        )*k+
+        360
+      )%360;
+
+    m.setLatLng(
+      [s.dlat,s.dlon]
+    );
+
+    if(
+      !s.dir ||
+      !s.dir.isConnected
+    ){
+
+      const el=
+        m.getElement();
+
+      s.dir=
+        el &&
+        el.firstChild &&
+        el.firstChild.firstChild;
+
+    }
+
+    if(s.dir){
+
+      s.dir.style.transform=
+        `rotate(${s.dhd}deg)`;
+
+    }
+
+  }
+
+}
+
+requestAnimationFrame(frame);
+
+/* =========================
+   STATUS
+========================= */
+
+function setStatus(
+  text,
+  state
+){
+
+  $("statusText")
+    .textContent=text;
+
+  $("statusDot")
+    .className=
+      "status-dot"+
+      (
+        state
+          ?" "+state
+          :""
+      );
+
+}
+
+/* =========================
+   OPEN WATERS AIS
+========================= */
+
+const OPEN_WATERS_AIS_URL="wss://ais.openwaters.io/v1/stream";
+
+// Hormozgan / Persian Gulf box: 40.5 sq. degrees, inside the anonymous limit.
+const AIS_BBOX=[[24,51.5,28.5,60.5]];
+const AIS_SNAPSHOT_URL="https://ais.openwaters.io/v1/vessels?bbox=24,51.5,28.5,60.5";
+
+let retry=0;
+let aisSocket=null;
+let reconnectTimer=null;
+
+function reconnect(){
+  clearTimeout(reconnectTimer);
+  if(aisSocket){
+    aisSocket.onclose=null;
+    aisSocket.onerror=null;
+    aisSocket.onmessage=null;
+    try{aisSocket.close();}catch(_){ }
+    aisSocket=null;
+  }
+  connectAIS();
+}
+
+function parseOpenWaters(ev){
+  if(!ev || ev.type!=="event") return null;
+  const lat=Number(ev.lat), lon=Number(ev.lon);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<-90||lat>90||lon<-180||lon>180) return null;
+
+  const kind=String(ev.kind||"vessel");
+  if(kind!=="vessel") return null; // map currently renders ships; routing is independent of AIS.
+
+  const mmsi=String(ev.mmsi||ev.message?.UserID||"");
+  if(!mmsi) return null;
+
+  const rawType=ev.message?.ShipType ?? ev.message?.ShipAndCargoType ?? ev.message?.AtoNType ?? ev.typeCode ?? 0;
+  const hd=Number(ev.heading ?? ev.hdg ?? ev.message?.TrueHeading);
+  const cog=Number(ev.cog ?? ev.message?.Cog);
+  const sog=Number(ev.sog ?? ev.message?.Sog);
+
+  return {
+    mmsi,
+    name:String(ev.name||ev.message?.Name||ev.message?.ShipName||"").trim()||"کشتی بدون نام",
+    lat, lon,
+    sog:Number.isFinite(sog)&&sog<102.3?sog:NaN,
+    cog:Number.isFinite(cog)&&cog<360?cog:NaN,
+    heading:Number.isFinite(hd)&&hd<360?hd:NaN,
+    type:category(rawType),
+    kind,
+    source:ev.source||"",
+    station:ev.station||"",
+    age_s:Number(ev.age_s),
+    msg_type:ev.msg_type||""
+  };
+}
+
+async function parseAISFrame(data){
+  if(typeof data==="string") return JSON.parse(data);
+  if(data instanceof ArrayBuffer) return JSON.parse(new TextDecoder().decode(data));
+  if(data && typeof data.text==="function") return JSON.parse(await data.text());
+  return JSON.parse(String(data));
+}
+
+function connectAIS(){
+  clearTimeout(reconnectTimer);
+  if(!navigator.onLine){
+    setStatus("آفلاین؛ AIS غیرفعال (نقشه ذخیره‌شده و مسیریابی کار می‌کنند)","error");
+    reconnectTimer=setTimeout(connectAIS,10000);
+    return;
+  }
+  setStatus("در حال اتصال به AIS...","");
+
+  try{
+    aisSocket=new WebSocket(OPEN_WATERS_AIS_URL);
+  }catch(e){
+    setStatus("AIS در دسترس نیست","error");
+    reconnectTimer=setTimeout(connectAIS,5000);
+    return;
+  }
+
+  aisSocket.onopen=()=>{
+    retry=0;
+    setStatus("متصل؛ دریافت AIS...","online");
+    aisSocket.send(JSON.stringify({
+      type:"subscribe",
+      bbox:AIS_BBOX,
+      snapshot:true
+    }));
+  };
+
+  aisSocket.onmessage=async ev=>{
+    try{
+      const d=await parseAISFrame(ev.data);
+
+      if(d?.type==="welcome"){
+        console.log("Open Waters AIS welcome",d.limits||{});
+        return;
+      }
+
+      if(d?.type==="error"){
+        console.error("Open Waters AIS error:",d.error||d);
+        setStatus("خطای AIS: "+(d.error||"نامشخص"),"error");
+        return;
+      }
+
+      const s=parseOpenWaters(d);
+      if(!s) return;
+
+      if(s.lat<AIS_BBOX[0][0]||s.lat>AIS_BBOX[0][2]||s.lon<AIS_BBOX[0][1]||s.lon>AIS_BBOX[0][3]) return;
+
+      if(!gotReal){
+        gotReal=true;
+        stopDemo();
+      }
+
+      setStatus("AIS زنده","online");
+      upsert(s);
+    }catch(e){
+      console.error("AIS parse error:",e);
+    }
+  };
+
+  aisSocket.onerror=()=>{
+    setStatus("خطا در اتصال AIS","error");
+  };
+
+  aisSocket.onclose=ev=>{
+    const w=Math.min(60000,5000*2**retry++);
+    console.warn("AIS socket closed",ev.code,ev.reason||"");
+    setStatus("AIS قطع شد؛ تلاش مجدد...","error");
+    reconnectTimer=setTimeout(connectAIS,w);
+  };
+}
+
+/* =========================
+   DEMO DATA
+========================= */
+
+function startDemo(){
+
+  if(
+    demoTimer ||
+    gotReal
+  )
+    return;
+
+  setStatus(
+    "داده‌ی نمایشی (AIS واقعی نیامد)",
+    "error"
+  );
+
+  const lanes=[
+
+    [
+      [25.9,57.3],
+      [26.4,56.75],
+      [26.62,56.35],
+      [26.5,55.8],
+      [26.6,55.0],
+      [26.9,54.0],
+      [27.0,52.6]
+    ],
+
+    [
+      [26.0,56.95],
+      [26.5,56.5],
+      [26.72,56.28],
+      [26.66,55.7],
+      [26.76,54.9],
+      [27.1,53.8],
+      [27.4,52.3]
+    ],
+
+    [
+      [26.3,57.0],
+      [26.8,56.6],
+      [27.04,56.38],
+      [27.12,56.23]
+    ],
+
+    [
+      [26.958,56.271],
+      [27.09,56.46]
+    ]
+
+  ];
+
+  const names=[
+    "آریا",
+    "هرمز",
+    "پارس",
+    "سیمرغ",
+    "دریا",
+    "شهباز",
+    "خزر",
+    "تیرگان",
+    "آبان",
+    "نوید"
+  ];
+
+  const types=[
+    70,
+    71,
+    79,
+    80,
+    82,
+    89,
+    60,
+    52
+  ];
+
+  const km=(
+    a,b,c,d
+  )=>{
+
+    const r=
+      Math.PI/180;
+
+    return 6371*
+      Math.hypot(
+        (c-a)*r,
+        (d-b)*r*
+        Math.cos(
+          (a+c)*r/2
+        )
+      );
+
+  };
+
+  const sim=[];
+
+  for(
+    let i=0;
+    i<32;
+    i++
+  ){
+
+    const li=
+      i%lanes.length;
+
+    sim.push({
+
+      id:"DEMO"+i,
+
+      name:
+        names[
+          i%names.length
+        ]+
+        " "+
+        fa(i+1),
+
+      type:
+        li===3
+          ?60
+          :types[i%7],
+
+      lane:
+        lanes[li],
+
+      seg:
+        Math.floor(
+          Math.random()*
+          (
+            lanes[li].length-1
+          )
+        ),
+
+      f:
+        Math.random(),
+
+      dir:
+        Math.random()<.5
+          ?1
+          :-1,
+
+      sog:
+        li===3
+          ?6+Math.random()*3
+          :9+Math.random()*7
+
+    });
+
+  }
+
+  const step=()=>{
+
+    sim.forEach(
+      v=>{
+
+        let a=
+          v.lane[v.seg];
+
+        let b=
+          v.lane[v.seg+1];
+
+        v.f+=
+          v.dir*
+          (
+            v.sog*
+            1.852*
+            2/
+            3600
+          )/
+          Math.max(
+            .001,
+            km(
+              a[0],
+              a[1],
+              b[0],
+              b[1]
+            )
+          );
+
+        if(v.f>1){
+
+          if(
+            v.seg<
+            v.lane.length-2
+          ){
+
+            v.seg++;
+            v.f-=1;
+
+          }else{
+
+            v.f=1;
+            v.dir=-1;
+
+          }
+
+        }
+
+        if(v.f<0){
+
+          if(v.seg>0){
+
+            v.seg--;
+            v.f+=1;
+
+          }else{
+
+            v.f=0;
+            v.dir=1;
+
+          }
+
+        }
+
+        a=
+          v.lane[v.seg];
+
+        b=
+          v.lane[v.seg+1];
+
+        const lat=
+          a[0]+
+          (
+            b[0]-a[0]
+          )*
+          v.f;
+
+        const lon=
+          a[1]+
+          (
+            b[1]-a[1]
+          )*
+          v.f;
+
+        let br=
+          Math.atan2(
+            (
+              b[1]-a[1]
+            )*
+            Math.cos(
+              lat*Math.PI/180
+            ),
+            b[0]-a[0]
+          )*
+          180/
+          Math.PI;
+
+        if(v.dir<0)
+          br+=180;
+
+        br=
+          (br+360)%360;
+
+        upsert({
+
+          mmsi:v.id,
+          name:v.name,
+          lat,
+          lon,
+          sog:v.sog,
+          cog:br,
+          heading:br,
+          type:category(v.type)
+
+        });
+
+      }
+    );
+
+  };
+
+  step();
+
+  demoTimer=
+    setInterval(
+      step,
+      2000
+    );
+
+}
+
+function stopDemo(){
+
+  if(!demoTimer)
+    return;
+
+  clearInterval(
+    demoTimer
+  );
+
+  demoTimer=null;
+
+  for(
+    const id
+    of [...ships.keys()]
+  ){
+
+    if(
+      id.startsWith("DEMO")
+    ){
+
+      removeShip(id);
+
+    }
+
+  }
+
+}
+
+/* =========================
+   CONTROLS
+========================= */
+
+document
+  .querySelectorAll(".filter")
+  .forEach(
+    b=>
+      b.addEventListener(
+        "click",
+        ()=>{
+
+          document
+            .querySelectorAll(
+              ".filter"
+            )
+            .forEach(
+              x=>
+                x.classList.remove(
+                  "active"
+                )
+            );
+
+          b.classList.add(
+            "active"
+          );
+
+          currentFilter=
+            b.dataset.filter;
+
+          $("filterLabel")
+            .textContent={
+
+              none:"انتخاب کنید",
+              all:"همه",
+              cargo:"باربری",
+              tanker:"نفتکش",
+              passenger:"مسافری",
+              other:"سایر",
+              fav:"علاقه‌مندی"
+
+            }[
+              currentFilter
+            ];
+
+          if(
+            currentFilter==="fav" &&
+            !favs.size
+          ){
+
+            toast(
+              "هنوز کشتی علاقه‌مندی ندارید؛ روی کشتی بزنید"
+            );
+
+          }
+
+          render();
+
+        }
+      )
+  );
+
+$("trailSwitch")
+  .addEventListener(
+    "click",
+    e=>{
+
+      showTrails=
+        !showTrails;
+
+      e.currentTarget
+        .classList
+        .toggle(
+          "on",
+          showTrails
+        );
+
+      render();
+
+    }
+  );
+
+$("activeSwitch")
+  .addEventListener(
+    "click",
+    e=>{
+
+      onlyActive=
+        !onlyActive;
+
+      e.currentTarget
+        .classList
+        .toggle(
+          "on",
+          onlyActive
+        );
+
+      render();
+
+    }
+  );
+
+/* =========================
+   PANEL
+========================= */
+
+const panel=
+  $("sidePanel");
+
+const overlay=
+  $("overlay");
+
+let firstPanelOpen=true;
+
+function openPanel(){
+
+  panel.classList.add(
+    "open"
+  );
+
+  overlay.classList.add(
+    "open"
+  );
+
+  if(
+    typeof dlInfo==="function"
+  )
+    dlInfo();
+
+  updateRouteShipList();
+
+  // بار اول که منو باز می‌شود، مستقیماً بخش مسیریابی نمایش داده شود.
+  if(firstPanelOpen){
+    firstPanelOpen=false;
+    requestAnimationFrame(()=>{
+      const routeSection=$("routeSection");
+      if(routeSection) routeSection.scrollIntoView({behavior:"auto",block:"start"});
+    });
+  }
+
+}
+
+function closePanel(){
+
+  panel.classList.remove(
+    "open"
+  );
+
+  overlay.classList.remove(
+    "open"
+  );
+
+}
+
+$("menuBtn").onclick=
+  openPanel;
+
+$("closePanel").onclick=
+  closePanel;
+
+overlay.onclick=
+  closePanel;
+
+/* =========================
+   LOCATION
+========================= */
+
+let me=null;
+
+$("locationBtn").onclick=()=>{ requestMyLocation(true).catch(e=>toast(geoMsg(e))); };
+
+$("retryBtn")
+  .onclick=
+  reconnect;
+
+/* =========================
+   SEARCH
+========================= */
+
+const si=
+  $("searchInput");
+
+const sr=
+  $("searchResults");
+
+const norm=
+  s=>
+    String(s)
+      .replace(
+        /ي/g,
+        "ی"
+      )
+      .replace(
+        /ك/g,
+        "ک"
+      )
+      .toLowerCase();
+
+si.addEventListener(
+  "input",
+  ()=>{
+
+    const q=
+      norm(
+        si.value.trim()
+      );
+
+    if(!q){
+
+      sr.classList.remove(
+        "open"
+      );
+
+      return;
+
+    }
+
+    const res=[];
+
+    ports.forEach(
+      p=>{
+
+        if(
+          norm(p[0]).includes(q)
+        ){
+
+          res.push({
+
+            k:"port",
+            name:p[0],
+            lat:p[3],
+            lon:p[4],
+            z:p[5]
+
+          });
+
+        }
+
+      }
+    );
+
+    for(
+      const s
+      of ships.values()
+    ){
+
+      if(res.length>=10)
+        break;
+
+      if(
+        norm(
+          s.name+
+          " "+
+          s.mmsi
+        ).includes(q)
+      ){
+
+        res.push({
+
+          k:"ship",
+          name:s.name,
+          lat:s.lat,
+          lon:s.lon,
+          z:13,
+          id:s.mmsi
+
+        });
+
+      }
+
+    }
+
+    sr.innerHTML=
+      res.length
+
+        ?res.map(
+          (r,i)=>`
+
+            <div
+              class="search-result"
+              data-i="${i}">
+
+              <div class="search-icon">
+
+                ${
+                  r.k==="ship"
+                    ?"🚢"
+                    :"⚓"
+                }
+
+              </div>
+
+              <div class="search-text">
+
+                <strong>
+                  ${esc(r.name)}
+                </strong>
+
+                <small>
+
+                  ${
+                    r.k==="ship"
+                      ?"کشتی · "+esc(r.id)
+                      :"بندر"
+                  }
+
+                </small>
+
+              </div>
+
+            </div>
+
+          `
+        ).join("")
+
+        :`
+
+          <div class="search-result">
+
+            <div class="search-icon">
+              🔍
+            </div>
+
+            <div class="search-text">
+
+              <strong>
+                نتیجه‌ای پیدا نشد
+              </strong>
+
+              <small>
+                نام بندر، نام کشتی یا MMSI
+              </small>
+
+            </div>
+
+          </div>
+
+        `;
+
+    sr.classList.add(
+      "open"
+    );
+
+    sr._res=res;
+
+  }
+);
+
+sr.addEventListener(
+  "click",
+  e=>{
+
+    const el=
+      e.target.closest(
+        "[data-i]"
+      );
+
+    if(!el)
+      return;
+
+    const r=
+      sr._res[
+        el.dataset.i
+      ];
+
+    if(
+      r.k==="ship" &&
+      !markers.has(r.id)
+    ){
+
+      currentFilter="all";
+
+      document
+        .querySelectorAll(
+          ".filter"
+        )
+        .forEach(
+          x=>
+            x.classList.toggle(
+              "active",
+              x.dataset.filter==="all"
+            )
+        );
+
+      render();
+
+    }
+
+    map.flyTo(
+      [r.lat,r.lon],
+      r.z,
+      {duration:1}
+    );
+
+    if(
+      r.k==="ship"
+    ){
+
+      setTimeout(
+        ()=>{
+
+          const m=
+            markers.get(r.id);
+
+          if(m)
+            m.openPopup();
+
+        },
+        1100
+      );
+
+    }
+
+    sr.classList.remove(
+      "open"
+    );
+
+    si.value="";
+
+  }
+);
+
+document.addEventListener(
+  "keydown",
+  e=>{
+
+    if(e.key==="Escape"){
+
+      closePanel();
+
+      sr.classList.remove(
+        "open"
+      );
+
+      $("tideSheet")
+        .classList.remove(
+          "open"
+        );
+
+      routePickMode=false;
+
+      $("routeMapPick")
+        .classList.remove(
+          "active"
+        );
+
+    }
+
+  }
+);
+
+/* =========================================================
+   MAP CLICK
+========================================================= */
+
+map.on(
+  "click",
+  e=>{
+
+    sr.classList.remove(
+      "open"
+    );
+
+    if(measureOn){ measureAdd(e.latlng); return; }
+
+    /*
+      اگر انتخاب مقصد مسیریابی فعال باشد،
+      این کلیک فقط مقصد را تعیین می‌کند
+      و پنجره جزرومد باز نمی‌شود.
+    */
+
+    if(routePickMode){
+
+      setRouteDestination(
+        e.latlng.lat,
+        e.latlng.lng,
+        "نقطه انتخاب‌شده روی نقشه",
+        false
+      );
+
+      routePickMode=false;
+
+      $("routeMapPick")
+        .classList.remove(
+          "active"
+        );
+
+      $("routeMapPick")
+        .textContent=
+          "📍 انتخاب مقصد روی نقشه";
+
+      openPanel();
+
+      return;
+
+    }
+
+    showTide(
+      e.latlng
+    );
+
+  }
+);
+
+/* =========================
+   OFFLINE MAP
+========================= */
+
+const tx=(
+  lon,
+  z
+)=>
+  Math.min(
+    2**z-1,
+    Math.max(
+      0,
+      Math.floor(
+        (
+          lon+180
+        )/
+        360*
+        2**z
+      )
+    )
+  );
+
+const ty=(
+  lat,
+  z
+)=>{
+
+  const r=
+    Math.max(
+      -85,
+      Math.min(
+        85,
+        lat
+      )
+    )*
+    Math.PI/
+    180;
+
+  return Math.min(
+    2**z-1,
+    Math.max(
+      0,
+      Math.floor(
+        (
+          1-
+          Math.log(
+            Math.tan(r)+
+            1/Math.cos(r)
+          )/
+          Math.PI
+        )/
+        2*
+        2**z
+      )
+    )
+  );
+
+};
+
+const MAXT=500;
+
+const dl={
+  running:false,
+  stop:false
+};
+
+function plan(){
+
+  const b=
+    map.getBounds();
+
+  const z0=
+    Math.round(
+      map.getZoom()
+    );
+
+  const out=[];
+
+  let zmax=z0;
+
+  for(
+    let z=z0;
+    z<=Math.min(
+      z0+4,
+      16
+    );
+    z++
+  ){
+
+    const x1=
+      tx(
+        b.getWest(),
+        z
+      );
+
+    const x2=
+      tx(
+        b.getEast(),
+        z
+      );
+
+    const y1=
+      ty(
+        b.getNorth(),
+        z
+      );
+
+    const y2=
+      ty(
+        b.getSouth(),
+        z
+      );
+
+    if(
+      out.length+
+      (
+        x2-x1+1
+      )*
+      (
+        y2-y1+1
+      )
+      >MAXT
+    )
+      break;
+
+    for(
+      let x=x1;
+      x<=x2;
+      x++
+    ){
+
+      for(
+        let y=y1;
+        y<=y2;
+        y++
+      ){
+
+        out.push(
+          [z,x,y]
+        );
+
+      }
+
+    }
+
+    zmax=z;
+
+  }
+
+  return {
+    tiles:out,
+    z0,
+    zmax
+  };
+
+}
+
+function dlInfo(){
+
+  if(dl.running)
+    return;
+
+  const p=
+    plan();
+
+  $("dlInfo")
+    .textContent=
+
+      p.tiles.length
+
+        ?`${fa(p.tiles.length)} کاشی • زوم ${fa(p.z0)} تا ${fa(p.zmax)} • حدود ${fa(Math.max(1,Math.round(p.tiles.length*18/1024)))} مگابایت`
+
+        :"محدوده بزرگ است؛ بیشتر زوم کنید";
+
+  tCount().then(
+    n=>{
+
+      $("dlStored")
+        .textContent=
+          fa(n||0)+
+          " کاشی ذخیره‌شده";
+
+    }
+  );
+
+}
+
+$("dlBtn")
+  .onclick=
+  async()=>{
+
+    if(dl.running){
+
+      dl.stop=true;
+
+      return;
+
+    }
+
+    const p=
+      plan();
+
+    if(!p.tiles.length){
+
+      toast(
+        "محدوده بزرگ است؛ بیشتر زوم کنید"
+      );
+
+      return;
+
+    }
+
+    if(!navigator.onLine){
+
+      toast(
+        "اینترنت وصل نیست"
+      );
+
+      return;
+
+    }
+
+    dl.running=true;
+    dl.stop=false;
+
+    $("dlBtn")
+      .textContent="توقف";
+
+    let done=0;
+    let fail=0;
+    let i=0;
+
+    const tot=
+      p.tiles.length;
+
+    const run=
+      async()=>{
+
+        while(
+          !dl.stop &&
+          i<tot
+        ){
+
+          const [
+            z,
+            x,
+            y
+          ]=
+            p.tiles[i++];
+
+          const urls=[L.Util.template(TILE_URL,{z,x,y})];
+          if(seaOn&&z>=8) urls.push(L.Util.template(SEA_URL,{z,x,y}));
+
+          for(const url of urls){
+            try{
+              if(!(await tHas(url))){
+                const rs=await fetch(url);
+                if(!rs.ok) throw 0;
+                await tPut(url,await rs.blob());
+                await new Promise(rr=>setTimeout(rr,120));
+              }
+            }catch(_){
+              if(url===urls[0]) fail++;
+            }
+          }
+
+          done++;
+
+          $("dlBar")
+            .style.width=
+              (
+                done/tot*100
+              )+
+              "%";
+
+          $("dlInfo")
+            .textContent=
+              `در حال دانلود ${fa(done)} از ${fa(tot)}`;
+
+        }
+
+      };
+
+    await Promise.all(
+      [
+        run(),
+        run()
+      ]
+    );
+
+    const stopped=
+      dl.stop;
+
+    dl.running=false;
+    dl.stop=false;
+
+    $("dlBtn")
+      .textContent="دانلود";
+
+    toast(
+      stopped
+        ?"دانلود متوقف شد"
+        :fail
+          ?`${fa(fail)} کاشی دانلود نشد`
+          :"دانلود کامل شد"
+    );
+
+    setTimeout(
+      ()=>{
+        $("dlBar")
+          .style.width="0";
+
+        dlInfo();
+
+      },
+      1200
+    );
+
+  };
+
+$("dlClr")
+  .onclick=
+  async()=>{
+
+    await tClear();
+
+    toast(
+      "نقشه‌های ذخیره‌شده پاک شد"
+    );
+
+    dlInfo();
+
+  };
+
+
+/* ---------- دانلود منطقه‌ای (آسیا، آفریقا، خلیج فارس) ---------- */
+const REGIONS={
+  gulf:{n:"خلیج فارس و دریای عمان",b:[21.5,47,31.5,63.5],z:[5,9],sea:true},
+  asia:{n:"آسیا",b:[-11,25,78,180],z:[2,6]},
+  africa:{n:"آفریقا",b:[-36,-19,38,52],z:[2,6]}
+};
+
+function regionTiles(r){
+  const out=[];
+  for(let z=r.z[0];z<=r.z[1];z++){
+    const x1=tx(r.b[1],z),x2=tx(r.b[3],z),y1=ty(r.b[2],z),y2=ty(r.b[0],z);
+    for(let x=x1;x<=x2;x++) for(let y=y1;y<=y2;y++) out.push([z,x,y]);
+  }
+  return out;
+}
+
+function regionLabels(){
+  Object.keys(REGIONS).forEach(k=>{
+    const id={gulf:"rgGulf",asia:"rgAsia",africa:"rgAfrica"}[k];
+    const n=regionTiles(REGIONS[k]).length;
+    const e=$(id);
+    if(e) e.textContent="· "+fa(n)+" کاشی (~"+fa(Math.max(1,Math.round(n*18/1024)))+" MB)";
+  });
+}
+
+async function downloadRegion(key){
+  const r=REGIONS[key];
+  if(!r) return;
+  if(dl.running){ toast("یک دانلود در حال انجام است"); return; }
+  if(!navigator.onLine){ toast("اینترنت وصل نیست"); return; }
+  const tiles=regionTiles(r);
+  if(!confirm("دانلود «"+r.n+"»: "+fa(tiles.length)+" کاشی (حدود "+fa(Math.max(1,Math.round(tiles.length*18/1024)))+" مگابایت). ادامه؟")) return;
+  dl.running=true; dl.stop=false;
+  $("dlBtn").textContent="توقف";
+  let done=0, fail=0, i=0;
+  const tot=tiles.length;
+  const run=async()=>{
+    while(!dl.stop&&i<tot){
+      const [z,x,y]=tiles[i++];
+      const urls=[L.Util.template(TILE_URL,{z,x,y})];
+      if(r.sea&&z>=8) urls.push(L.Util.template(SEA_URL,{z,x,y}));
+      for(const url of urls){
+        try{
+          if(!(await tHas(url))){
+            const rs=await fetch(url);
+            if(!rs.ok) throw 0;
+            await tPut(url,await rs.blob());
+            await new Promise(rr=>setTimeout(rr,150));
+          }
+        }catch(_){ if(url===urls[0]) fail++; }
+      }
+      done++;
+      $("dlBar").style.width=(done/tot*100)+"%";
+      $("dlInfo").textContent="«"+r.n+"»: "+fa(done)+" از "+fa(tot);
+    }
+  };
+  await Promise.all([run(),run()]);
+  const stopped=dl.stop;
+  dl.running=false; dl.stop=false;
+  $("dlBtn").textContent="دانلود";
+  toast(stopped?"دانلود متوقف شد":fail?fa(fail)+" کاشی دانلود نشد؛ دوباره بزنید":"«"+r.n+"» کامل شد");
+  setTimeout(()=>{ $("dlBar").style.width="0"; dlInfo(); },1200);
+}
+
+document.querySelectorAll("[data-region]").forEach(b=>{
+  b.addEventListener("click",()=>downloadRegion(b.dataset.region));
+});
+regionLabels();
+
+map.on(
+  "moveend",
+  dlInfo
+);
+
+/* =========================================================
+   TIDE — POINT POPUP
+========================================================= */
+
+const tideCache=
+  new Map();
+
+let tideTok=0;
+
+const tpop=
+  L.popup(
+    {
+      maxWidth:300,
+      autoPanPadding:[
+        10,
+        90
+      ]
+    }
+  );
+
+const faDigits=v=>String(v).replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[d]);
+const hm=ms=>faDigits(new Date(ms).toISOString().slice(11,16));
+
+const dayKey=
+  ms=>
+    new Date(ms)
+      .toISOString()
+      .slice(
+        0,
+        10
+      );
+
+const m2=
+  v=>
+    (
+      v<0
+        ?"−"
+        :""
+    )+
+    fa(
+      Math.abs(v)
+        .toFixed(2)
+    )+
+    " م";
+
+function tideExt(
+  ts,
+  vs
+){
+
+  const out=[];
+
+  for(
+    let i=1;
+    i<vs.length-1;
+    i++
+  ){
+
+    const a=vs[i-1];
+    const b=vs[i];
+    const c=vs[i+1];
+
+    if(
+      a==null ||
+      b==null ||
+      c==null
+    )
+      continue;
+
+    const d=
+      a-2*b+c;
+
+    const hi=
+      b>a &&
+      b>=c;
+
+    const lo=
+      b<a &&
+      b<=c;
+
+    if(
+      !hi &&
+      !lo
+    )
+      continue;
+
+    out.push(
+      d
+        ?{
+            t:
+              ts[i]+
+              (
+                (a-c)/
+                (2*d)
+              )*
+              3600000,
+
+            v:
+              b-
+              (
+                (a-c)**2
+              )/
+              (8*d),
+
+            hi
+          }
+
+        :{
+            t:ts[i],
+            v:b,
+            hi
+          }
+    );
+
+  }
+
+  return out;
+
+}
+
+function tideCard(
+  ll,
+  body
+){
+
+  return `
+
+    <div class="popup">
+
+      <h3>
+        🌊 جزر و مد
+      </h3>
+
+      <div
+        style="
+          font-size:10px;
+          color:#6c7d7c;
+          margin:-4px 0 8px
+        "
+        dir="ltr">
+
+        ${ll.lat.toFixed(3)},
+        ${ll.lng.toFixed(3)}
+
+      </div>
+
+      ${body}
+
+    </div>
+
+  `;
+
+}
+
+function tideHTML(
+  d,
+  ll
+){
+
+  const H=
+    d.hourly||{};
+
+  const vs=
+    H.sea_level_height_msl;
+
+  const t0s=
+    H.time;
+
+  if(
+    !vs ||
+    !t0s ||
+    vs.every(
+      v=>v==null
+    )
+  ){
+
+    return tideCard(
+      ll,
+      `
+
+        <div
+          style="
+            font-size:12px;
+            line-height:1.8
+          ">
+
+          برای این نقطه داده‌ی
+          جزر و مد نیست؛ احتمالاً
+          خشکی است یا خیلی به ساحل
+          نزدیک است.
+
+          <br><br>
+
+          روی نقطه‌ای در دریای باز
+          بزنید.
+
+        </div>
+
+      `
+    );
+
+  }
+
+  const off=
+    (
+      d.utc_offset_seconds||0
+    )*
+    1000;
+
+  const ts=
+    t0s.map(
+      t=>
+        Date.parse(
+          t+"Z"
+        )
+    );
+
+  const now=
+    Date.now()+off;
+
+  let i=
+    ts.findIndex(
+      t=>t>now
+    );
+
+  if(i<1)
+    i=1;
+
+  const a=
+    vs[i-1];
+
+  const b=
+    vs[i];
+
+  const cur=
+    a!=null &&
+    b!=null
+
+      ?a+
+        (
+          b-a
+        )*
+        (
+          (
+            now-ts[i-1]
+          )/
+          (
+            ts[i]-ts[i-1]
+          )
+        )
+
+      :null;
+
+  const rising=
+    a!=null &&
+    b!=null
+      ?b>a
+      :null;
+
+  const ex=
+    tideExt(
+      ts,
+      vs
+    );
+
+  const next=
+    ex
+      .filter(
+        e=>e.t>now
+      )
+      .slice(
+        0,
+        4
+      );
+
+  const W0=
+    now-
+    12*3600e3;
+
+  const W1=
+    now+
+    36*3600e3;
+
+  const pts=[];
+
+  ts.forEach(
+    (t,k)=>{
+
+      if(
+        vs[k]!=null &&
+        t>=W0 &&
+        t<=W1
+      ){
+
+        pts.push(
+          [
+            t,
+            vs[k]
+          ]
+        );
+
+      }
+
+    }
+  );
+
+  if(
+    pts.length<2
+  ){
+
+    return tideCard(
+      ll,
+      `
+        <div
+          style="
+            font-size:12px
+          ">
+
+          داده‌ی کافی نیست.
+
+        </div>
+      `
+    );
+
+  }
+
+  const lo=
+    Math.min(
+      ...pts.map(
+        p=>p[1]
+      )
+    );
+
+  const hiV=
+    Math.max(
+      ...pts.map(
+        p=>p[1]
+      )
+    );
+
+  const span=
+    Math.max(
+      .05,
+      hiV-lo
+    );
+
+  const W=300;
+  const Hh=120;
+  const pt=16;
+  const pb=14;
+
+  const X=
+    t=>
+      (
+        t-W0
+      )/
+      (
+        W1-W0
+      )*
+      W;
+
+  const Y=
+    v=>
+      pt+
+      (
+        1-
+        (
+          v-lo
+        )/
+        span
+      )*
+      (
+        Hh-pt-pb
+      );
+
+  const path=
+    pts.map(
+      (p,k)=>
+        (
+          k
+            ?"L"
+            :"M"
+        )+
+        X(
+          p[0]
+        ).toFixed(1)+
+        " "+
+        Y(
+          p[1]
+        ).toFixed(1)
+    ).join("");
+
+  const inW=
+    ex.filter(
+      e=>
+        e.t>=W0 &&
+        e.t<=W1
+    );
+
+  const peaks=
+    inW.map(
+      e=>`
+
+        <circle
+          cx="${X(e.t).toFixed(1)}"
+          cy="${Y(e.v).toFixed(1)}"
+          r="3.2"
+          fill="${
+            e.hi
+              ?"#0f766e"
+              :"#d97706"
+          }"
+          stroke="#fff"
+          stroke-width="1.2"
+        />
+
+        <text
+          x="${Math.min(
+            W-14,
+            Math.max(
+              14,
+              X(e.t)
+            )
+          ).toFixed(1)}"
+          y="${(
+            Y(e.v)+
+            (
+              e.hi
+                ?-6
+                :12
+            )
+          ).toFixed(1)}"
+          font-size="8.5"
+          text-anchor="middle"
+          fill="#17302f">
+
+          ${hm(e.t)}
+
+        </text>
+
+      `
+    ).join("");
+
+  const nx=
+    X(now).toFixed(1);
+
+  const svg=`
+
+    <svg
+      viewBox="0 0 ${W} ${Hh}"
+      width="100%"
+      style="
+        display:block;
+        background:#f1f6f6;
+        border-radius:10px
+      ">
+
+      <path
+        d="
+          ${path}
+
+          L${X(
+            pts[
+              pts.length-1
+            ][0]
+          ).toFixed(1)}
+          ${Hh}
+
+          L${X(
+            pts[0][0]
+          ).toFixed(1)}
+          ${Hh}
+
+          Z
+        "
+        fill="rgba(15,118,110,.12)"
+      />
+
+      <path
+        d="${path}"
+        fill="none"
+        stroke="#0f766e"
+        stroke-width="2"
+        stroke-linejoin="round"
+      />
+
+      <line
+        x1="${nx}"
+        x2="${nx}"
+        y1="6"
+        y2="${Hh-4}"
+        stroke="#dc2626"
+        stroke-width="1.2"
+        stroke-dasharray="3 3"
+      />
+
+      ${peaks}
+
+    </svg>
+
+  `;
+
+  const today=
+    dayKey(now);
+
+  const tomorrow=
+    dayKey(
+      now+864e5
+    );
+
+  const dayName=ms=>{const k=dayKey(ms);return k===today?"امروز":k===tomorrow?"فردا":"پس‌فردا";};
+
+  const rows=
+    next.map(
+      e=>`
+
+        <div
+          class="popup-item"
+          style="
+            display:flex;
+            justify-content:space-between;
+            gap:6px
+          ">
+
+          <span
+            style="
+              font-size:11px;
+              color:#17302f
+            ">
+
+            ${
+              e.hi
+                ?"▲ مد (اوج)"
+                :"▼ جزر (کف)"
+            }
+
+            ·
+            ${dayName(e.t)}
+            ${hm(e.t)}
+
+          </span>
+
+          <strong>
+            ${m2(e.v)}
+          </strong>
+
+        </div>
+
+      `
+    ).join("");
+
+  const state=
+    rising==null
+      ?""
+      :rising
+        ?"در حال بالا آمدن (مد)"
+        :"در حال پایین رفتن (جزر)";
+
+  return tideCard(
+    ll,
+    `
+
+      <div
+        style="
+          font-size:12px;
+          margin-bottom:8px
+        ">
+
+        <b>
+          اکنون
+          ${
+            cur==null
+              ?"—"
+              :m2(cur)
+          }
+        </b>
+
+        ${
+          state
+            ?" · "+state
+            :""
+        }
+
+        <br>
+
+        <span
+          style="
+            color:#6c7d7c;
+            font-size:10px
+          ">
+
+          نسبت به تراز میانگین دریا
+          • نمودار ۱۲ ساعت قبل تا ۳۶
+          ساعت بعد
+          • خط قرمز = اکنون
+
+        </span>
+
+      </div>
+
+      ${svg}
+
+      <div
+        style="
+          display:grid;
+          gap:5px;
+          margin-top:8px
+        ">
+
+        ${
+          rows ||
+          "<small>اوج یا کفی در این بازه پیدا نشد.</small>"
+        }
+
+      </div>
+
+      <div
+        style="
+          font-size:9px;
+          color:#8a9a99;
+          margin-top:8px
+        ">
+
+        داده‌ی مدل Open-Meteo؛
+        تقریبی است و برای ناوبری
+        استفاده نشود.
+
+      </div>
+
+      <button
+        class="fv"
+        onclick="
+          openTidePanel(
+            ${ll.lat},
+            ${ll.lng},
+            'نقطه‌ی لمس‌شده'
+          )
+        ">
+
+        📅 ۷ روز آینده
+
+      </button>
+
+      ${spotButtons(ll.lat,ll.lng)}
+
+
+    `
+  );
+
+}
+
+/* =========================
+   SHOW TIDE
+========================= */
+
+async function showTide(ll){
+
+  const tok=
+    ++tideTok;
+
+  tpop
+    .setLatLng(ll)
+    .setContent(
+      tideCard(
+        ll,
+        "<small>در حال دریافت اطلاعات...</small>"
+      )
+    )
+    .openOn(map);
+
+  const w=
+    ll.wrap();
+
+  const key=
+    w.lat.toFixed(2)+
+    ","+
+    w.lng.toFixed(2);
+
+  try{
+
+    let d=
+      tideCache.get(key);
+
+    if(!d){
+
+      const r=
+        await fetch(
+          `https://marine-api.open-meteo.com/v1/marine?latitude=${w.lat.toFixed(2)}&longitude=${w.lng.toFixed(2)}&hourly=sea_level_height_msl&past_days=1&forecast_days=3&timezone=auto`
+        );
+
+      if(!r.ok)
+        throw 0;
+
+      d=
+        await r.json();
+
+      tideCache.set(
+        key,
+        d
+      );
+
+    }
+
+    if(
+      tok===tideTok
+    ){
+
+      tpop.setContent(
+        tideHTML(
+          d,
+          ll
+        )
+      );
+
+    }
+
+  }catch(_){
+
+    if(
+      tok===tideTok
+    ){
+
+      tpop.setContent(
+        tideCard(
+          ll,
+          `
+
+            <div
+              style="
+                font-size:12px;
+                line-height:1.8
+              ">
+
+              دریافت اطلاعات ممکن نشد؛
+              اینترنت را بررسی کنید و
+              دوباره بزنید.
+
+            </div>
+
+          `
+        )
+      );
+
+    }
+
+  }
+
+}
+
+/* =========================================================
+   TIDE 7 DAYS
+========================================================= */
+
+const tide7=
+  new Map();
+
+let tideTok2=0;
+let tideSel=null;
+
+const faDay=
+  ms=>
+    new Intl.DateTimeFormat(
+      "fa-IR-u-ca-persian",
+      {
+        weekday:"long",
+        day:"numeric",
+        month:"long",
+        timeZone:"UTC"
+      }
+    ).format(
+      new Date(ms)
+    );
+
+function dense(
+  ts,
+  vs
+){
+
+  const out=[];
+
+  for(
+    let i=1;
+    i<vs.length-2;
+    i++
+  ){
+
+    const p0=vs[i-1];
+    const p1=vs[i];
+    const p2=vs[i+1];
+    const p3=vs[i+2];
+
+    if(
+      p0==null ||
+      p1==null ||
+      p2==null ||
+      p3==null
+    )
+      continue;
+
+    for(
+      let s=0;
+      s<6;
+      s++
+    ){
+
+      const u=
+        s/6;
+
+      const u2=
+        u*u;
+
+      const u3=
+        u2*u;
+
+      out.push(
+        [
+          ts[i]+
+          u*
+          3600e3,
+
+          .5*
+          (
+            2*p1+
+            (
+              -p0+p2
+            )*u+
+            (
+              2*p0-
+              5*p1+
+              4*p2-
+              p3
+            )*u2+
+            (
+              -p0+
+              3*p1-
+              3*p2+
+              p3
+            )*u3
+          )
+        ]
+      );
+
+    }
+
+  }
+
+  return out;
+
+}
+
+function denseExt(dn){
+
+  const raw=[];
+
+  for(
+    let k=1;
+    k<dn.length-1;
+    k++
+  ){
+
+    const a=
+      dn[k-1][1];
+
+    const b=
+      dn[k][1];
+
+    const c=
+      dn[k+1][1];
+
+    if(
+      b>a &&
+      b>=c
+    ){
+
+      raw.push({
+        t:dn[k][0],
+        v:b,
+        hi:true
+      });
+
+    }else if(
+      b<a &&
+      b<=c
+    ){
+
+      raw.push({
+        t:dn[k][0],
+        v:b,
+        hi:false
+      });
+
+    }
+
+  }
+
+  const out=[];
+
+  for(
+    const e
+    of raw
+  ){
+
+    const l=
+      out[
+        out.length-1
+      ];
+
+    if(
+      l &&
+      l.hi===e.hi &&
+      e.t-l.t<
+      4*3600e3
+    ){
+
+      if(
+        e.hi
+          ?e.v>l.v
+          :e.v<l.v
+      ){
+
+        out[
+          out.length-1
+        ]=e;
+
+      }
+
+    }else{
+
+      out.push(e);
+
+    }
+
+  }
+
+  return out;
+
+}
+
+function kmBetween(
+  a,b,c,d
+){
+
+  const r=
+    Math.PI/180;
+
+  return 6371*
+    Math.hypot(
+      (c-a)*r,
+      (d-b)*r*
+      Math.cos(
+        (a+c)*r/2
+      )
+    );
+
+}
+
+function weekHTML(d){
+
+  const H=
+    d.hourly||{};
+
+  const vs=
+    H.sea_level_height_msl;
+
+  const t0s=
+    H.time;
+
+  if(
+    !vs ||
+    !t0s ||
+    vs.every(
+      v=>v==null
+    )
+  ){
+
+    return `
+
+      <div class="tl">
+
+        برای این نقطه داده‌ی جزر و مد
+        نیست؛ احتمالاً خشکی است یا خیلی
+        به ساحل نزدیک است.
+
+      </div>
+
+    `;
+
+  }
+
+  const off=
+    (
+      d.utc_offset_seconds||0
+    )*
+    1000;
+
+  const ts=
+    t0s.map(
+      t=>
+        Date.parse(
+          t+"Z"
+        )
+    );
+
+  const now=
+    Date.now()+off;
+
+  const dn=
+    dense(
+      ts,
+      vs
+    );
+
+  if(
+    dn.length<20
+  ){
+
+    return `
+
+      <div class="tl">
+        داده‌ی کافی نیست.
+      </div>
+
+    `;
+
+  }
+
+  const ex=
+    denseExt(dn);
+
+  const day0=
+    Math.floor(
+      now/864e5
+    )*
+    864e5;
+
+  const days=[];
+
+  for(
+    let k=0;
+    k<7;
+    k++
+  ){
+
+    const a=
+      day0+
+      k*864e5;
+
+    const b=
+      a+
+      864e5;
+
+    const pts=
+      dn.filter(
+        p=>
+          p[0]>=a &&
+          p[0]<=b
+      );
+
+    if(
+      pts.length>6
+    ){
+
+      days.push({
+        a,
+        b,
+        pts,
+        ex:
+          ex.filter(
+            e=>
+              e.t>=a &&
+              e.t<b
+          )
+      });
+
+    }
+
+  }
+
+  const all=
+    days.flatMap(
+      x=>
+        x.pts.map(
+          p=>p[1]
+        )
+    );
+
+  if(!all.length){
+
+    return `
+
+      <div class="tl">
+        داده‌ی ۷ روزه برای این نقطه
+        در دسترس نیست.
+      </div>
+
+    `;
+
+  }
+
+  const lo=
+    Math.min(
+      ...all
+    );
+
+  const hi=
+    Math.max(
+      ...all
+    );
+
+  const span=
+    Math.max(
+      .05,
+      hi-lo
+    );
+
+  const W=300;
+  const Hh=100;
+
+  const X=(
+    t,
+    a
+  )=>
+    (
+      t-a
+    )/
+    864e5*
+    W;
+
+  const Y=
+    v=>
+      16+
+      (
+        1-
+        (
+          v-lo
+        )/
+        span
+      )*
+      (
+        Hh-16-14
+      );
+
+  const cards=
+    days.map(
+      (x,idx)=>{
+
+        const path=
+          x.pts.map(
+            (p,k)=>
+              (
+                k
+                  ?"L"
+                  :"M"
+              )+
+              X(
+                p[0],
+                x.a
+              ).toFixed(1)+
+              " "+
+              Y(
+                p[1]
+              ).toFixed(1)
+          ).join("");
+
+        const grid=
+          [0,6,12,18]
+            .map(
+              hh=>`
+
+                <line
+                  x1="${
+                    hh/24*W
+                  }"
+                  x2="${
+                    hh/24*W
+                  }"
+                  y1="4"
+                  y2="${Hh-12}"
+                  stroke="#d5e2e1"
+                  stroke-width=".8"
+                />
+
+                <text
+                  x="${
+                    hh/24*W+2
+                  }"
+                  y="${Hh-2}"
+                  font-size="8"
+                  fill="#8a9a99">
+
+                  ${
+                    fa(
+                      String(hh)
+                        .padStart(
+                          2,
+                          "0"
+                        )
+                    )
+                  }
+
+                </text>
+
+              `
+            ).join("");
+
+        const peaks=
+          x.ex.map(
+            e=>{
+
+              const px=
+                X(
+                  e.t,
+                  x.a
+                );
+
+              const py=
+                Y(e.v);
+
+              return `
+
+                <circle
+                  cx="${px.toFixed(1)}"
+                  cy="${py.toFixed(1)}"
+                  r="3.2"
+                  fill="${
+                    e.hi
+                      ?"#0f766e"
+                      :"#d97706"
+                  }"
+                  stroke="#fff"
+                  stroke-width="1.2"
+                />
+
+                <text
+                  x="${Math.min(
+                    W-14,
+                    Math.max(
+                      14,
+                      px
+                    )
+                  ).toFixed(1)}"
+                  y="${(
+                    py+
+                    (
+                      e.hi
+                        ?-6
+                        :12
+                    )
+                  ).toFixed(1)}"
+                  font-size="8.5"
+                  text-anchor="middle"
+                  fill="#17302f">
+
+                  ${hm(e.t)}
+
+                </text>
+
+              `;
+
+            }
+          ).join("");
+
+        const nowLine=
+          idx===0
+            ?`
+
+              <line
+                x1="${
+                  X(
+                    now,
+                    x.a
+                  ).toFixed(1)
+                }"
+                x2="${
+                  X(
+                    now,
+                    x.a
+                  ).toFixed(1)
+                }"
+                y1="4"
+                y2="${Hh-12}"
+                stroke="#dc2626"
+                stroke-width="1.2"
+                stroke-dasharray="3 3"
+              />
+
+            `
+            :"";
+
+        const svg=`
+
+          <svg
+            viewBox="0 0 ${W} ${Hh}"
+            width="100%"
+            style="
+              display:block;
+              background:#f1f6f6;
+              border-radius:10px
+            ">
+
+            ${grid}
+
+            <path
+              d="
+                ${path}
+
+                L${X(
+                  x.pts[
+                    x.pts.length-1
+                  ][0],
+                  x.a
+                ).toFixed(1)}
+
+                ${Hh-12}
+
+                L${X(
+                  x.pts[0][0],
+                  x.a
+                ).toFixed(1)}
+
+                ${Hh-12}
+
+                Z
+              "
+              fill="rgba(15,118,110,.12)"
+            />
+
+            <path
+              d="${path}"
+              fill="none"
+              stroke="#0f766e"
+              stroke-width="2"
+              stroke-linejoin="round"
+            />
+
+            ${nowLine}
+            ${peaks}
+
+          </svg>
+
+        `;
+
+        const list=
+          x.ex.map(
+            e=>`
+
+              <div>
+
+                <span>
+
+                  ${
+                    e.hi
+                      ?"▲ مد"
+                      :"▼ جزر"
+                  }
+
+                  ·
+
+                  ${hm(e.t)}
+
+                </span>
+
+                <strong>
+                  ${m2(e.v)}
+                </strong>
+
+              </div>
+
+            `
+          ).join("");
+
+        return `
+
+          <div class="dcard">
+
+            <div class="dtitle">
+
+              <span
+                style="
+                  background:transparent;
+                  color:#17302f;
+                  padding:0;
+                  font-size:12px;
+                ">
+
+                ${faDay(x.a)}
+
+              </span>
+
+              ${
+                idx===0
+                  ?"<span>امروز</span>"
+                  :idx===1
+                    ?"<span>فردا</span>"
+                    :""
+              }
+
+            </div>
+
+            ${svg}
+
+            <div class="dpeaks">
+
+              ${
+                list ||
+                "<div><span>اوج یا کفی نیست</span></div>"
+              }
+
+            </div>
+
+          </div>
+
+        `;
+
+      }
+    ).join("");
+
+  const dist=
+    (
+      d.latitude!=null &&
+      tideSel
+    )
+      ?kmBetween(
+        tideSel.lat,
+        tideSel.lng,
+        d.latitude,
+        d.longitude
+      )
+      :null;
+
+  const info=`
+
+    <div
+      class="dnote"
+      style="
+        margin-bottom:8px;
+        background:#eef6f5;
+        border-radius:10px;
+        padding:8px;
+      ">
+
+      دامنه در ۷ روز:
+      ${m2(lo)}
+      تا
+      ${m2(hi)}
+
+      • ساعت‌ها به وقت محلی
+
+      • خط قرمز = اکنون
+
+      ${d.cachedAge!=null?" • ⚠️ بدون اینترنت؛ داده‌ی ذخیره‌شده‌ی "+fa(Math.round(d.cachedAge))+" ساعت پیش":""}
+
+      ${
+        dist!=null
+          ?`
+            • فاصله‌ی نقطه‌ی مدل تا مکان
+            انتخابی ≈
+            ${fa(Math.round(dist))}
+            کیلومتر
+          `
+          :""
+      }
+
+    </div>
+
+  `;
+
+  const foot=`
+
+    <div class="dnote">
+
+      منبع: Open-Meteo
+      (مدل دریایی با تفکیک حدود ۸ کیلومتر؛
+      داده‌ی DWD/Open-Meteo).
+
+      این مقدار شامل اثر فشار هوا و
+      جریان‌های بزرگ‌مقیاس هم هست،
+      پس با جدول رسمی بندر ممکن است
+      چند ده دقیقه و چند سانتی‌متر فرق کند.
+
+      برای ناوبری و تصمیم‌های ایمنی
+      استفاده نشود.
+
+    </div>
+
+  `;
+
+  return(
+    info+
+    cards+
+    foot
+  );
+
+}
+
+/* =========================
+   LOAD TIDE
+========================= */
+
+async function loadTide(){
+
+  if(!tideSel)
+    return;
+
+  const {
+    lat,
+    lng,
+    name
+  }=
+    tideSel;
+
+  const tok=
+    ++tideTok2;
+
+  $("tideSub")
+    .textContent=
+      name+
+      " • "+
+      lat.toFixed(2)+
+      "، "+
+      lng.toFixed(2);
+
+  document
+    .querySelectorAll(
+      ".ts-chip"
+    )
+    .forEach(
+      c=>
+        c.classList.toggle(
+          "on",
+          c.dataset.n===name
+        )
+    );
+
+  $("tideBody")
+    .innerHTML=
+      `
+
+        <div class="tl">
+          در حال دریافت اطلاعات...
+        </div>
+
+      `;
+
+  const w=
+    L.latLng(
+      lat,
+      lng
+    ).wrap();
+
+  const key=
+    w.lat.toFixed(2)+
+    ","+
+    w.lng.toFixed(2);
+
+  try{
+
+    let d=
+      tide7.get(key);
+
+    if(
+      !d ||
+      Date.now()-d.at>
+      30*60e3
+    ){
+
+      d=await tideFetchJson(`https://marine-api.open-meteo.com/v1/marine?latitude=${w.lat.toFixed(2)}&longitude=${w.lng.toFixed(2)}&hourly=sea_level_height_msl&forecast_days=8&timezone=auto`,key);
+
+      d.at=
+        Date.now();
+
+      tide7.set(
+        key,
+        d
+      );
+
+    }
+
+    if(
+      tok===tideTok2
+    ){
+
+      tideOffMs=(d.utc_offset_seconds||0)*1000;
+      $("tideBody")
+        .innerHTML=
+          weekHTML(d);
+
+      $("tideBody")
+        .scrollTop=0;
+
+    }
+
+  }catch(_){
+
+    if(
+      tok===tideTok2
+    ){
+
+      $("tideBody")
+        .innerHTML=`
+
+          <div class="tl">
+
+            دریافت اطلاعات ممکن نشد؛
+            اینترنت را بررسی کنید.
+
+            <br><br>
+
+            <button
+              class="fv"
+              style="max-width:220px"
+              onclick="loadTide()">
+
+              🔄 تلاش مجدد
+
+            </button>
+
+          </div>
+
+        `;
+
+    }
+
+  }
+
+}
+
+/* =========================
+   OPEN TIDE PANEL
+========================= */
+
+function openTidePanel(
+  lat,
+  lng,
+  name
+){
+
+  tideSel={
+    lat,
+    lng,
+    name:
+      name ||
+      "نقطه‌ی انتخابی"
+  };
+
+  $("tideSheet")
+    .classList.add(
+      "open"
+    );
+
+  $("tideBody")
+    .scrollTop=0;
+
+  map.closePopup();
+
+  loadTide();
+
+  setTimeout(
+    ()=>{
+      map.invalidateSize(true);
+    },
+    320
+  );
+
+}
+
+/* =========================
+   TIDE CHIPS
+========================= */
+
+$("tideChips")
+  .innerHTML=
+
+    ports.map(
+      (p,i)=>`
+
+        <button
+          class="ts-chip"
+          data-n="${p[0]}"
+          data-i="${i}">
+
+          ${p[0]}
+
+        </button>
+
+      `
+    ).join("")+
+
+    `
+
+      <button
+        class="ts-chip"
+        data-n="مرکز نقشه"
+        data-i="c">
+
+        📍 مرکز نقشه
+
+      </button>
+
+    `;
+
+$("tideChips")
+  .addEventListener(
+    "click",
+    e=>{
+
+      const b=
+        e.target.closest(
+          ".ts-chip"
+        );
+
+      if(!b)
+        return;
+
+      if(
+        b.dataset.i==="c"
+      ){
+
+        const c=
+          map.getCenter();
+
+        openTidePanel(
+          c.lat,
+          c.lng,
+          "مرکز نقشه"
+        );
+
+      }else{
+
+        const p=
+          ports[
+            b.dataset.i
+          ];
+
+        openTidePanel(
+          p[3],
+          p[4],
+          p[0]
+        );
+
+      }
+
+    }
+  );
+
+/* دکمه موج */
+
+$("tideFab")
+  .onclick=
+  ()=>{
+
+    if(tideSel){
+
+      $("tideSheet")
+        .classList.add(
+          "open"
+        );
+
+      setTimeout(
+        ()=>{
+          map.invalidateSize(true);
+        },
+        320
+      );
+
+    }else{
+
+      const p=
+        ports[0];
+
+      openTidePanel(
+        p[3],
+        p[4],
+        p[0]
+      );
+
+    }
+
+  };
+
+/* بستن */
+
+$("tideClose")
+  .onclick=
+  ()=>{
+
+    $("tideSheet")
+      .classList.remove(
+        "open"
+      );
+
+    setTimeout(
+      ()=>{
+        map.invalidateSize(true);
+      },
+      320
+    );
+
+  };
+
+/* =========================================================
+   ظاهر شبیه Navionics: نوار پایین · لایه‌ها · علائم دریایی · اندازه‌گیری · واحد · حالت شب
+========================================================= */
+
+let unit="nm";
+try{ unit=localStorage.getItem("marine_unit")==="km"?"km":"nm"; }catch(_){}
+
+function fmtDist(km){
+  if(!Number.isFinite(km)) return "—";
+  if(km<1) return fa(Math.round(km*1000))+" متر";
+  if(unit==="km") return fa(km.toFixed(km<10?2:1))+" km";
+  const nm=km/1.852;
+  return fa(nm.toFixed(nm<10?2:1))+" nm";
+}
+
+/* ---------- لایه‌ی علائم دریایی OpenSeaMap ---------- */
+const SEA_URL="https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png";
+let seaOn=false;
+try{ seaOn=localStorage.getItem("marine_sea_on")==="1"; }catch(_){}
+
+const seaLayer=new OfflineLayer(
+  SEA_URL,
+  {
+    minZoom:8,
+    maxZoom:19,
+    maxNativeZoom:18,
+    attribution:'© <a href="https://www.openseamap.org" target="_blank" rel="noopener">OpenSeaMap</a>'
+  }
+);
+
+function setSea(on){
+  seaOn=!!on;
+  try{ localStorage.setItem("marine_sea_on",seaOn?"1":"0"); }catch(_){}
+  if(seaOn) seaLayer.addTo(map);
+  else map.removeLayer(seaLayer);
+  $("seaSwitch").classList.toggle("on",seaOn);
+  if(typeof dlInfo==="function") dlInfo();
+}
+
+/* ---------- حالت شب ---------- */
+let nightOn=false;
+try{ nightOn=localStorage.getItem("marine_night")==="1"; }catch(_){}
+
+function setNight(on){
+  nightOn=!!on;
+  try{ localStorage.setItem("marine_night",nightOn?"1":"0"); }catch(_){}
+  document.body.classList.toggle("night",nightOn);
+  $("nightSwitch").classList.toggle("on",nightOn);
+}
+
+/* ---------- واحد ---------- */
+function setUnit(u){
+  unit=u==="km"?"km":"nm";
+  try{ localStorage.setItem("marine_unit",unit); }catch(_){}
+  paintUnit();
+  renderSpotList();
+  mRedraw();
+  updateHud();
+}
+
+function paintUnit(){
+  $("unitNm").classList.toggle("secondary",unit!=="nm");
+  $("unitKm").classList.toggle("secondary",unit!=="km");
+}
+
+/* ---------- کارت لایه‌ها ---------- */
+const layerCard=$("layerCard");
+
+function toggleLayerCard(force){
+  const open=force!=null?force:!layerCard.classList.contains("open");
+  layerCard.classList.toggle("open",open);
+  const b=document.querySelector('#navbar [data-nav="layers"]');
+  if(b) b.classList.toggle("on",open);
+}
+
+/* ---------- ابزار اندازه‌گیری ---------- */
+let measureOn=false;
+let mPts=[];
+const mLayer=L.layerGroup().addTo(map);
+
+function mRedraw(){
+  mLayer.clearLayers();
+  let cum=0, last=0;
+  if(mPts.length>1){
+    L.polyline(mPts,{color:"#2563eb",weight:4,opacity:.9,dashArray:"8 6",interactive:false}).addTo(mLayer);
+  }
+  mPts.forEach((p,i)=>{
+    if(i>0){
+      last=seaKm(mPts[i-1][0],mPts[i-1][1],p[0],p[1]);
+      cum+=last;
+    }
+    L.circleMarker(p,{radius:5,color:"#fff",weight:2,fillColor:"#2563eb",fillOpacity:1,interactive:false})
+      .bindTooltip(i?fmtDist(cum):"شروع",{permanent:true,direction:"top",offset:[0,-6],className:"m-tip"})
+      .addTo(mLayer);
+  });
+  const bar=$("measureText");
+  if(!bar) return;
+  if(mPts.length<2){
+    bar.innerHTML="📏 روی نقشه نقطه‌ها را لمس کنید";
+    return;
+  }
+  const a=mPts[mPts.length-2], b=mPts[mPts.length-1];
+  const brg=routeBearing(a,b);
+  const sp=Math.max(1,Number($("routeSpeed")&&$("routeSpeed").value)||12);
+  bar.innerHTML=`<strong>مجموع: ${fmtDist(cum)}</strong><br>
+    آخرین ضلع: ${fmtDist(last)} · ${fa(Math.round(brg))}° ${bearingText(brg)}<br>
+    <span style="opacity:.8">زمان تقریبی با ${fa(sp)} گره: ${formatHours(cum/1.852/sp)}</span>`;
+}
+
+function setMeasure(on){
+  measureOn=!!on;
+  document.body.classList.toggle("measuring",measureOn);
+  $("measureBtn").classList.toggle("on",measureOn);
+  $("measureBar").style.display=measureOn?"block":"none";
+  if(measureOn){
+    map.closePopup();
+    toggleLayerCard(false);
+    mRedraw();
+  }else{
+    mPts=[];
+    mLayer.clearLayers();
+  }
+}
+
+function measureAdd(ll){
+  mPts.push([ll.lat,ll.lng]);
+  mRedraw();
+}
+
+/* ---------- اتصال‌ها ---------- */
+$("seaSwitch").addEventListener("click",()=>setSea(!seaOn));
+$("nightSwitch").addEventListener("click",()=>setNight(!nightOn));
+$("unitNm").addEventListener("click",()=>setUnit("nm"));
+$("unitKm").addEventListener("click",()=>setUnit("km"));
+$("layerClose").addEventListener("click",()=>toggleLayerCard(false));
+$("measureBtn").addEventListener("click",()=>setMeasure(!measureOn));
+$("measureUndo").addEventListener("click",()=>{ mPts.pop(); mRedraw(); });
+$("measureClear").addEventListener("click",()=>{ mPts=[]; mRedraw(); });
+$("measureDone").addEventListener("click",()=>setMeasure(false));
+
+map.on("click",()=>toggleLayerCard(false));
+
+document.querySelectorAll("#navbar [data-nav]").forEach(b=>{
+  b.addEventListener("click",()=>{
+    const k=b.dataset.nav;
+    if(k!=="layers") toggleLayerCard(false);
+    if(k==="explore"){
+      closePanel();
+      $("tideSheet").classList.remove("open");
+      map.closePopup();
+      if(typeof myPos!=="undefined"&&myPos){
+        map.flyTo([myPos.lat,myPos.lon],Math.max(map.getZoom(),11),{duration:.8});
+      }else{
+        toast("برای یافتن موقعیت، دکمه‌ی ⌖ بالای صفحه را بزنید");
+      }
+    }else if(k==="layers"){
+      closePanel();
+      toggleLayerCard();
+    }else if(k==="route"){
+      openPanel();
+      scrollToId("routeSection");
+    }else if(k==="spots"){
+      openPanel();
+      scrollToId("fishSection");
+    }else if(k==="more"){
+      openPanel();
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        const pb=document.querySelector(".panel-body");
+        if(pb) pb.scrollTop=0;
+      }));
+    }
+  });
+});
+
+L.control.scale({metric:true,imperial:false,position:"bottomleft"}).addTo(map);
+
+/* وضعیت اولیه */
+paintUnit();
+setNight(nightOn);
+if(seaOn) seaLayer.addTo(map);
+$("seaSwitch").classList.toggle("on",seaOn);
+
+
+/* =========================================================
+   صیادی و دریانوردی
+   نقاط صید · ردیابی زنده · هشدار لنگر · MOB · ماه و ساعت صید · وضعیت دریا
+========================================================= */
+
+const tmLocal=ms=>new Date(ms).toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit",hour12:false});
+
+function dms(v,pos,neg){
+  const h=v>=0?pos:neg;
+  v=Math.abs(v);
+  const d=Math.floor(v);
+  const m=Math.floor((v-d)*60);
+  const s=Math.round(((v-d)*60-m)*60);
+  return `${d}°${String(m).padStart(2,"0")}′${String(s).padStart(2,"0")}″${h}`;
+}
+const coordHTML=(lat,lon)=>`<span dir="ltr">${lat.toFixed(5)}, ${lon.toFixed(5)}<br>${dms(lat,"N","S")} ${dms(lon,"E","W")}</span>`;
+
+function downloadText(name,text,mime){
+  const b=new Blob([text],{type:mime||"text/plain"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(b);
+  a.download=name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+}
+
+function scrollToId(id){
+  requestAnimationFrame(()=>{
+    const e=$(id);
+    if(e) e.scrollIntoView({behavior:"smooth",block:"start"});
+  });
+}
+
+/* ---------- پنجره‌ی اطلاعات نقطه ---------- */
+const fpop=L.popup({maxWidth:300,autoPanPadding:[10,90]});
+
+function fCard(title,lat,lng,body){
+  return `<div class="popup"><h3>${title}</h3>
+    <div style="font-size:10px;color:#6c7d7c;margin:-4px 0 8px;line-height:1.7">${coordHTML(lat,lng)}</div>
+    ${body}</div>`;
+}
+
+function spotButtons(lat,lng){
+  const st="margin:0;font-size:11px";
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+    <button class="fv" style="${st}" onclick="saveSpotAt(${lat},${lng})">📌 ذخیره‌ی نقطه</button>
+    <button class="fv route-popup-btn" style="${st}" onclick="routeToPoint(${lat},${lng})">🧭 مسیر به اینجا</button>
+    <button class="fv" style="${st};background:#2563eb" onclick="showSeaAt(${lat},${lng})">🌬️ وضعیت دریا</button>
+    <button class="fv" style="${st};background:#7c3aed" onclick="showSunMoonAt(${lat},${lng})">🌙 ماه و ساعت صید</button>
+  </div>`;
+}
+
+function showSpotMenu(ll){
+  fpop.setLatLng(ll).setContent(fCard("📍 نقطه‌ی انتخابی",ll.lat,ll.lng,spotButtons(ll.lat,ll.lng))).openOn(map);
+}
+
+/* ---------- نقاط صید ---------- */
+let spots=[];
+try{ spots=JSON.parse(localStorage.getItem("marine_spots")||"[]"); if(!Array.isArray(spots)) spots=[]; }catch(_){ spots=[]; }
+const spotLayer=L.layerGroup().addTo(map);
+
+function persistSpots(){
+  try{ localStorage.setItem("marine_spots",JSON.stringify(spots)); }catch(_){ toast("ذخیره‌سازی در مرورگر ممکن نشد"); }
+}
+
+const spotById=id=>spots.find(s=>s.id===Number(id));
+
+function spotIcon(s){
+  return L.divIcon({
+    className:"",
+    html:`<div class="spot-pin${s.mob?" mob":""}">${s.mob?"🆘":"📌"}</div>`,
+    iconSize:[28,28],
+    iconAnchor:[14,26],
+    popupAnchor:[0,-24]
+  });
+}
+
+function spotDistText(s){
+  const ref=(typeof live!=="undefined"&&live)?live:(typeof myPos!=="undefined"&&myPos)?myPos:null;
+  if(!ref) return "";
+  const km=seaKm(ref.lat,ref.lon,s.lat,s.lon);
+  const b=routeBearing([ref.lat,ref.lon],[s.lat,s.lon]);
+  return `${fmtDist(km)} · ${fa(Math.round(b))}° ${bearingText(b)}`;
+}
+
+function spotPopup(s){
+  const st="margin:0;font-size:11px";
+  const d=spotDistText(s);
+  return `<div class="popup"><h3>${s.mob?"🆘":"📌"} ${esc(s.name)}</h3>
+    <div style="font-size:10px;color:#6c7d7c;line-height:1.7">${coordHTML(s.lat,s.lon)}</div>
+    ${d?`<div style="font-size:11px;margin-top:6px">از موقعیت شما: ${d}</div>`:""}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+      <button class="fv route-popup-btn" style="${st}" onclick="routeToSpot(${s.id})">🧭 مسیر</button>
+      <button class="fv" style="${st};background:#2563eb" onclick="renameSpot(${s.id})">✏️ تغییر نام</button>
+      <button class="fv" style="${st};background:#7c3aed" onclick="showSunMoonAt(${s.lat},${s.lon})">🌙 ساعت صید</button>
+      <button class="fv" style="${st};background:#b91c1c" onclick="deleteSpot(${s.id})">🗑 حذف</button>
+    </div></div>`;
+}
+
+function renderSpots(){
+  spotLayer.clearLayers();
+  spots.forEach(s=>{
+    L.marker([s.lat,s.lon],{icon:spotIcon(s)})
+      .bindPopup(()=>spotPopup(s))
+      .addTo(spotLayer);
+  });
+  renderSpotList();
+}
+
+function renderSpotList(){
+  const box=$("spotList");
+  if(!box) return;
+  if(!spots.length){
+    box.innerHTML=`<div class="route-result" style="margin-top:0">هنوز نقطه‌ای ذخیره نشده است.</div>`;
+    return;
+  }
+  box.innerHTML=[...spots].reverse().map(s=>{
+    const d=spotDistText(s);
+    return `<div class="setting" style="display:block;margin-bottom:6px">
+      <div class="setting-text">
+        <strong>${s.mob?"🆘":"📌"} ${esc(s.name)}</strong>
+        <small dir="ltr" style="text-align:right">${s.lat.toFixed(4)}, ${s.lon.toFixed(4)}</small>
+        ${d?`<small>${d}</small>`:""}
+      </div>
+      <div class="route-actions" style="grid-template-columns:repeat(3,1fr);margin-top:7px">
+        <button class="route-action secondary" onclick="goSpot(${s.id})">🔍 برو</button>
+        <button class="route-action" onclick="routeToSpot(${s.id})">🧭 مسیر</button>
+        <button class="route-action danger" onclick="deleteSpot(${s.id})">🗑</button>
+      </div></div>`;
+  }).join("");
+}
+
+function addSpot(lat,lon,name,mob){
+  const s={id:Date.now()+Math.floor(Math.random()*1000),name:name,lat:Number(lat),lon:Number(lon),mob:!!mob,t:Date.now()};
+  spots.push(s);
+  persistSpots();
+  renderSpots();
+  return s;
+}
+
+function saveSpotAt(lat,lng){
+  const def="نقطه "+fa(spots.length+1);
+  const n=prompt("نام نقطه:",def);
+  if(n===null) return;
+  addSpot(lat,lng,(n.trim()||def).slice(0,60),false);
+  map.closePopup();
+  toast("نقطه ذخیره شد");
+}
+
+function renameSpot(id){
+  const s=spotById(id);
+  if(!s) return;
+  const n=prompt("نام جدید:",s.name);
+  if(n===null||!n.trim()) return;
+  s.name=n.trim().slice(0,60);
+  persistSpots();
+  renderSpots();
+  map.closePopup();
+}
+
+function deleteSpot(id){
+  const s=spotById(id);
+  if(!s) return;
+  if(!confirm("«"+s.name+"» حذف شود؟")) return;
+  spots=spots.filter(x=>x.id!==s.id);
+  persistSpots();
+  renderSpots();
+  map.closePopup();
+  toast("حذف شد");
+}
+
+function goSpot(id){
+  const s=spotById(id);
+  if(!s) return;
+  closePanel();
+  map.flyTo([s.lat,s.lon],Math.max(map.getZoom(),12),{duration:1});
+  setTimeout(()=>{
+    let found=null;
+    spotLayer.eachLayer(l=>{ const p=l.getLatLng(); if(p.lat===s.lat&&p.lng===s.lon) found=l; });
+    if(found) found.openPopup();
+  },1100);
+}
+
+function routeToSpot(id){
+  const s=spotById(id);
+  if(!s) return;
+  setRouteDestination(s.lat,s.lon,s.name,true);
+  map.closePopup();
+  openPanel();
+  scrollToId("routeSection");
+}
+
+function routeToPoint(lat,lng){
+  setRouteDestination(lat,lng,"نقطه‌ی انتخاب‌شده",false);
+  map.closePopup();
+  openPanel();
+  scrollToId("routeSection");
+}
+
+function gpxDoc(wpts,trk){
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Marine Map" xmlns="http://www.topografix.com/GPX/1/1">${wpts}${trk}</gpx>`;
+}
+const gpxWpts=arr=>arr.map(s=>`<wpt lat="${s.lat}" lon="${s.lon}"><name>${esc(s.name)}</name></wpt>`).join("");
+const gpxTrk=()=>track.length<2?"":`<trk><name>Track</name><trkseg>${track.map(p=>`<trkpt lat="${p[0]}" lon="${p[1]}"><time>${new Date(p[2]).toISOString()}</time></trkpt>`).join("")}</trkseg></trk>`;
+
+/* ---------- ردیابی زنده ---------- */
+let watchId=null;
+let live=null;
+let track=[];
+let trackLine=null;
+let wakeLock=null;
+try{ track=JSON.parse(localStorage.getItem("marine_track")||"[]"); if(!Array.isArray(track)) track=[]; }catch(_){ track=[]; }
+
+function persistTrack(){
+  try{ localStorage.setItem("marine_track",JSON.stringify(track.slice(-5000))); }catch(_){}
+}
+
+function trackKm(){
+  let d=0;
+  for(let i=1;i<track.length;i++) d+=seaKm(track[i-1][0],track[i-1][1],track[i][0],track[i][1]);
+  return d;
+}
+
+function drawTrack(){
+  if(trackLine){ map.removeLayer(trackLine); trackLine=null; }
+  if(track.length>1){
+    trackLine=L.polyline(track.map(p=>[p[0],p[1]]),{color:"#f59e0b",weight:3,opacity:.9,interactive:false}).addTo(map);
+  }
+}
+
+function updateTrackInfo(){
+  const e=$("trackInfo");
+  if(!e) return;
+  const on=watchId!=null;
+  if(!track.length){
+    e.textContent=on?"در حال دریافت موقعیت...":"ردیابی خاموش است.";
+    return;
+  }
+  const km=trackKm();
+  const dur=track[track.length-1][2]-track[0][2];
+  e.innerHTML=`${on?"🟢 در حال ثبت":"⚪ متوقف"}<div class="route-stats">
+    <div class="route-stat"><span>مسافت</span><strong>${fa((km/1.852).toFixed(1))} nm<br><small>${fa(km.toFixed(1))} km</small></strong></div>
+    <div class="route-stat"><span>مدت</span><strong>${formatHours(dur/3600e3)}</strong></div>
+    <div class="route-stat"><span>تعداد نقطه</span><strong>${fa(track.length)}</strong></div>
+    <div class="route-stat"><span>میانگین سرعت</span><strong>${dur>60e3?fa((km/1.852/(dur/3600e3)).toFixed(1))+" kn":"—"}</strong></div></div>`;
+}
+
+function updateHud(){
+  const h=$("hud");
+  if(!h) return;
+  if(watchId==null){ h.style.display="none"; return; }
+  h.style.display="block";
+  if(!live){ h.textContent="⏳ در انتظار سیگنال GPS..."; return; }
+  const parts=[];
+  parts.push(`⚡ ${live.sog!=null?fa(live.sog.toFixed(1))+" kn":"—"}`);
+  parts.push(`🧭 ${live.hdg!=null?fa(Math.round(live.hdg))+"°":"—"}`);
+  parts.push(`🎯 دقت ${fa(Math.round(live.acc||0))} m`);
+  let line=parts.join(" · ");
+  const dest=routeState.destination;
+  if(dest){
+    const km=seaKm(live.lat,live.lon,dest.lat,dest.lon);
+    const nm=km/1.852;
+    const b=routeBearing([live.lat,live.lon],[dest.lat,dest.lon]);
+    let eta="";
+    if(live.sog!=null&&live.sog>0.5) eta=" · ETA "+formatHours(nm/live.sog);
+    line+=`<br>🏁 ${esc(dest.name)}: ${fmtDist(km)} · ${fa(Math.round(b))}° ${bearingText(b)}${eta}`;
+  }
+  h.innerHTML=line;
+}
+
+function onPos(p){
+  const c=p.coords;
+  const lat=c.latitude, lon=c.longitude, acc=c.accuracy;
+  const sog=(c.speed!=null&&Number.isFinite(c.speed))?c.speed*1.943844:null;
+  const hdg=(c.heading!=null&&Number.isFinite(c.heading)&&sog!=null&&sog>0.5)?c.heading:null;
+  live={lat,lon,acc,sog,hdg,t:Date.now()};
+  setMyPosition(lat,lon,acc,false);
+  const last=track[track.length-1];
+  if(acc<=60&&(!last||seaKm(last[0],last[1],lat,lon)*1000>=15)){
+    track.push([lat,lon,Date.now()]);
+    persistTrack();
+    drawTrack();
+  }
+  updateTrackInfo();
+  updateHud();
+  checkAnchor();
+  renderSpotList();
+}
+
+async function wakeOn(){
+  try{
+    if("wakeLock" in navigator&&!wakeLock){
+      wakeLock=await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release",()=>{wakeLock=null;});
+    }
+  }catch(_){}
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"&&watchId!=null) wakeOn();
+});
+
+function startTracking(){
+  if(!navigator.geolocation){ toast(geoMsg({code:0})); return; }
+  if(watchId!=null) return;
+  watchId=navigator.geolocation.watchPosition(
+    onPos,
+    e=>{ toast(geoMsg(e).slice(0,70)); if(e&&e.code===1) stopTracking(); },
+    {enableHighAccuracy:true,maximumAge:2000,timeout:20000}
+  );
+  const b=$("trackBtn");
+  b.textContent="■ توقف ردیابی";
+  b.classList.add("active");
+  wakeOn();
+  updateTrackInfo();
+  updateHud();
+  toast("ردیابی شروع شد؛ صفحه را باز نگه دارید");
+}
+
+function stopTracking(){
+  if(watchId!=null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+  if(wakeLock){ try{wakeLock.release();}catch(_){} wakeLock=null; }
+  if(anchor) clearAnchor(true);
+  const b=$("trackBtn");
+  b.textContent="▶ شروع ردیابی";
+  b.classList.remove("active");
+  updateTrackInfo();
+  updateHud();
+}
+
+/* ---------- هشدار لنگر ---------- */
+let anchor=null;
+let anchorCircle=null;
+let alarmAt=0;
+
+function beep(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return;
+    const ac=beep.ac||(beep.ac=new AC());
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.type="square"; o.frequency.value=880; g.gain.value=.2;
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime+.6);
+  }catch(_){}
+}
+
+function clearAnchor(silent){
+  anchor=null;
+  if(anchorCircle){ map.removeLayer(anchorCircle); anchorCircle=null; }
+  $("anchorBtn").textContent="⚓ ثبت لنگر و فعال‌سازی هشدار";
+  $("anchorBtn").classList.remove("active");
+  $("anchorInfo").textContent="هشدار لنگر خاموش است.";
+  if(!silent) toast("هشدار لنگر خاموش شد");
+}
+
+function checkAnchor(){
+  if(!anchor||!live) return;
+  const d=seaKm(anchor.lat,anchor.lon,live.lat,live.lon)*1000;
+  const out=d>anchor.r+Math.min(live.acc||0,anchor.r/2);
+  $("anchorInfo").innerHTML=out
+    ?`<strong style="color:#b91c1c">🚨 قایق از محدوده خارج شده است!</strong><br>فاصله از لنگر: ${fa(Math.round(d))} متر (مجاز ${fa(anchor.r)})`
+    :`✅ داخل محدوده<br>فاصله از لنگر: ${fa(Math.round(d))} متر از ${fa(anchor.r)}`;
+  if(out&&Date.now()-alarmAt>4000){
+    alarmAt=Date.now();
+    beep();
+    try{ navigator.vibrate&&navigator.vibrate([500,200,500,200,500]); }catch(_){}
+    toast("🚨 هشدار لنگر: قایق دارد دور می‌شود");
+  }
+}
+
+async function toggleAnchor(){
+  if(anchor){ clearAnchor(); return; }
+  let p;
+  try{ p=await requestMyLocation(true); }catch(e){ toast(geoMsg(e).slice(0,80)); return; }
+  const r=Math.max(20,Math.min(1000,Number($("anchorRadius").value)||80));
+  anchor={lat:p.lat,lon:p.lon,r};
+  if(anchorCircle) map.removeLayer(anchorCircle);
+  anchorCircle=L.circle([p.lat,p.lon],{radius:r,color:"#dc2626",weight:2,fillColor:"#dc2626",fillOpacity:.08,dashArray:"6 6",interactive:false}).addTo(map);
+  $("anchorBtn").textContent="■ خاموش کردن هشدار لنگر";
+  $("anchorBtn").classList.add("active");
+  $("anchorInfo").textContent="لنگر ثبت شد؛ ردیابی فعال است.";
+  startTracking();
+  beep();
+}
+
+/* ---------- سقوط به دریا (MOB) ---------- */
+async function mobPress(){
+  let p;
+  try{ p=await requestMyLocation(true); }catch(e){ toast(geoMsg(e).slice(0,80)); return; }
+  const name="🆘 سقوط به دریا "+tmLocal(Date.now());
+  addSpot(p.lat,p.lon,name,true);
+  setRouteDestination(p.lat,p.lon,name,true);
+  startTracking();
+  try{ navigator.vibrate&&navigator.vibrate([300,100,300]); }catch(_){}
+  toast("🆘 موقعیت ثبت شد؛ فاصله و جهت در بالای نقشه نمایش داده می‌شود");
+}
+
+/* ---------- ماه، طلوع/غروب، ساعت‌های صید (آفلاین) ---------- */
+function sunTimes(date,lat,lon){
+  const rad=Math.PI/180;
+  const jd=Date.UTC(date.getFullYear(),date.getMonth(),date.getDate(),12)/864e5+2440587.5;
+  const n=Math.ceil(jd-2451545.0+0.0008);
+  const Js=n-lon/360;
+  const M=(357.5291+0.98560028*Js)%360;
+  const C=1.9148*Math.sin(M*rad)+0.02*Math.sin(2*M*rad)+0.0003*Math.sin(3*M*rad);
+  const lam=(M+C+180+102.9372)%360;
+  const Jt=2451545.0+Js+0.0053*Math.sin(M*rad)-0.0069*Math.sin(2*lam*rad);
+  const sinD=Math.sin(lam*rad)*Math.sin(23.4397*rad);
+  const cosD=Math.cos(Math.asin(sinD));
+  const cosW=(Math.sin(-0.833*rad)-Math.sin(lat*rad)*sinD)/(Math.cos(lat*rad)*cosD);
+  if(cosW<-1||cosW>1) return null;
+  const w=Math.acos(cosW)/rad;
+  const ms=j=>(j-2440587.5)*864e5;
+  return {noon:ms(Jt),rise:ms(Jt-w/360),set:ms(Jt+w/360)};
+}
+
+const SYN=29.530588853;
+
+function moonInfo(date){
+  const jd=date.getTime()/864e5+2440587.5;
+  let age=(jd-2451550.1)%SYN;
+  if(age<0) age+=SYN;
+  return {age,illum:(1-Math.cos(2*Math.PI*age/SYN))/2};
+}
+
+function moonPhase(age){
+  const L=[
+    [1.85,"🌑","ماه نو (محاق)"],
+    [5.54,"🌒","هلال رو‌به‌رشد"],
+    [9.23,"🌓","تربیع اول"],
+    [12.91,"🌔","رو‌به‌بدر"],
+    [16.61,"🌕","ماه کامل (بدر)"],
+    [20.30,"🌖","رو‌به‌هلال"],
+    [23.99,"🌗","تربیع آخر"],
+    [27.68,"🌘","هلال رو‌به‌زوال"]
+  ];
+  for(const x of L) if(age<x[0]) return {icon:x[1],name:x[2]};
+  return {icon:"🌑",name:"ماه نو (محاق)"};
+}
+
+function fishRating(age){
+  const d=Math.min(age,Math.abs(age-SYN/2),SYN-age);
+  return d<2?5:d<3.5?4:d<5?3:2;
+}
+
+function solunar(date,lat,lon){
+  const st=sunTimes(date,lat,lon);
+  if(!st) return null;
+  const mi=moonInfo(new Date(st.noon));
+  const P=24.8412*3600e3;
+  const T0=st.noon+mi.age/SYN*P;
+  const d0=new Date(date.getFullYear(),date.getMonth(),date.getDate()).getTime();
+  const d1=d0+864e5;
+  const pick=off=>{
+    const out=[];
+    for(let k=-6;k<=6;k++){
+      const t=T0+off+k*P/2;
+      if(t>=d0&&t<d1) out.push(t);
+    }
+    return out.sort((a,b)=>a-b);
+  };
+  return {st,major:pick(0),minor:pick(P/4)};
+}
+
+function sunMoonHTML(lat,lng){
+  const now=new Date();
+  const mi=moonInfo(now);
+  const ph=moonPhase(mi.age);
+  const sol=solunar(now,lat,lng);
+  const stars=fishRating(mi.age);
+  if(!sol) return `<div style="font-size:12px">برای این عرض جغرافیایی محاسبه ممکن نشد.</div>`;
+  const st=sol.st;
+  const win=(t,h)=>`${tmLocal(t-h*3600e3)} تا ${tmLocal(t+h*3600e3)}`;
+  const row=(a,b)=>`<div class="popup-item" style="display:flex;justify-content:space-between;gap:6px"><span style="font-size:11px;color:#17302f">${a}</span><strong>${b}</strong></div>`;
+  const rows=[
+    row("🌅 طلوع خورشید",tmLocal(st.rise)),
+    row("🌇 غروب خورشید",tmLocal(st.set)),
+    row("🎣 سحر (بهترین)",win(st.rise,0.5)),
+    row("🎣 غروب (بهترین)",win(st.set,0.5)),
+    ...sol.major.map(t=>row("⭐ زمان اصلی ماه",win(t,1))),
+    ...sol.minor.map(t=>row("✨ زمان فرعی ماه",win(t,0.5)))
+  ].join("");
+  return `<div style="font-size:12px;margin-bottom:8px"><b>${ph.icon} ${ph.name}</b> · روشنایی ${fa(Math.round(mi.illum*100))}٪<br>
+    <span style="font-size:11px">شانس صید (طبق باور صیادان): ${"★".repeat(stars)}${"☆".repeat(5-stars)}</span></div>
+    <div style="display:grid;gap:5px">${rows}</div>
+    <div style="font-size:9px;color:#8a9a99;margin-top:8px;line-height:1.8">ساعت‌ها به وقت دستگاه شما و تقریبی (دقت حدود ±۱ ساعت برای ماه) است. کاملاً آفلاین محاسبه می‌شود.</div>`;
+}
+
+function showSunMoonAt(lat,lng){
+  fpop.setLatLng([lat,lng]).setContent(fCard("🌙 ماه و ساعت‌های صید",lat,lng,sunMoonHTML(lat,lng))).openOn(map);
+}
+
+/* ---------- وضعیت دریا و باد (آنلاین) ---------- */
+function max12(obj,key){
+  const H=obj&&obj.hourly;
+  if(!H||!H[key]||!H.time) return NaN;
+  const off=(obj.utc_offset_seconds||0)*1000;
+  const now=Date.now()+off;
+  let m=NaN;
+  H.time.forEach((t,i)=>{
+    const ts=Date.parse(t+"Z");
+    const v=H[key][i];
+    if(v!=null&&ts>=now-3600e3&&ts<=now+12*3600e3) m=Number.isFinite(m)?Math.max(m,v):v;
+  });
+  return m;
+}
+
+async function showSeaAt(lat,lng){
+  const title="🌬️ وضعیت دریا و باد";
+  fpop.setLatLng([lat,lng]).setContent(fCard(title,lat,lng,"<small>در حال دریافت اطلاعات...</small>")).openOn(map);
+  if(!navigator.onLine){
+    fpop.setContent(fCard(title,lat,lng,`<div style="font-size:12px;line-height:1.8">این بخش اینترنت لازم دارد.</div>`));
+    return;
+  }
+  const w=L.latLng(lat,lng).wrap();
+  const q=`latitude=${w.lat.toFixed(2)}&longitude=${w.lng.toFixed(2)}&timezone=auto&forecast_days=2`;
+  const j=u=>fetch(u).then(r=>r.ok?r.json():null).catch(()=>null);
+  const [m,a]=await Promise.all([
+    j(`https://marine-api.open-meteo.com/v1/marine?${q}&current=wave_height,wave_period,wave_direction,sea_surface_temperature&hourly=wave_height`),
+    j(`https://api.open-meteo.com/v1/forecast?${q}&current=wind_speed_10m,wind_gusts_10m,wind_direction_10m,temperature_2m&hourly=wind_speed_10m,wind_gusts_10m&wind_speed_unit=kn`)
+  ]);
+  if(!m&&!a){
+    fpop.setContent(fCard(title,lat,lng,`<div style="font-size:12px;line-height:1.8">دریافت اطلاعات ممکن نشد؛ اینترنت را بررسی کنید.</div>`));
+    return;
+  }
+  const mc=(m&&m.current)||{}, ac=(a&&a.current)||{};
+  const f1=v=>v==null||!Number.isFinite(Number(v))?"—":fa(Number(v).toFixed(1));
+  const dir=v=>v==null?"":` · از ${bearingText(Number(v))}`;
+  const waveNow=Number(mc.wave_height), windNow=Number(ac.wind_speed_10m);
+  const gustNow=Number(ac.wind_gusts_10m);
+  const wave12=max12(m,"wave_height"), gust12=max12(a,"wind_gusts_10m");
+  const waveMax=Math.max(...[waveNow,wave12].filter(Number.isFinite),0);
+  const windMax=Math.max(...[windNow,gustNow,gust12].filter(Number.isFinite),0);
+  let lvl,col,txt;
+  if(waveMax>=2.5||windMax>=30){lvl="🔴";col="#b91c1c";txt="خطرناک؛ از رفتن به دریا خودداری کنید";}
+  else if(waveMax>=1.5||windMax>=20){lvl="🟠";col="#d97706";txt="احتیاط؛ فقط با شناور مناسب و تجربه";}
+  else{lvl="🟢";col="#15803d";txt="شرایط نسبتاً آرام";}
+  const row=(x,y)=>`<div class="popup-item" style="display:flex;justify-content:space-between;gap:6px"><span style="font-size:11px;color:#17302f">${x}</span><strong>${y}</strong></div>`;
+  const body=`<div style="font-size:13px;font-weight:800;color:${col};margin-bottom:8px">${lvl} ${txt}</div>
+    <div style="display:grid;gap:5px">
+      ${row("🌊 ارتفاع موج",f1(mc.wave_height)+" م"+dir(mc.wave_direction))}
+      ${row("⏱ دوره‌ی موج",f1(mc.wave_period)+" ث")}
+      ${row("🌊 بیشینه‌ی موج ۱۲ ساعت آینده",f1(wave12)+" م")}
+      ${row("💨 باد",f1(ac.wind_speed_10m)+" kn"+dir(ac.wind_direction_10m))}
+      ${row("💨 تندباد (فعلی / ۱۲ ساعت آینده)",f1(ac.wind_gusts_10m)+" / "+f1(gust12)+" kn")}
+      ${row("🌡 دمای آب دریا",f1(mc.sea_surface_temperature)+" °C")}
+      ${row("🌡 دمای هوا",f1(ac.temperature_2m)+" °C")}
+    </div>
+    <div style="font-size:9px;color:#8a9a99;margin-top:8px;line-height:1.8">داده‌ی مدل Open-Meteo و تقریبی است؛ جایگزین پیش‌بینی رسمی هواشناسی و اطلاعیه‌ی سازمان بنادر نیست.</div>`;
+  fpop.setContent(fCard(title,lat,lng,body));
+}
+
+/* ---------- اتصال دکمه‌ها ---------- */
+$("trackBtn").addEventListener("click",()=>{ watchId==null?startTracking():stopTracking(); });
+$("trackGpx").addEventListener("click",()=>{
+  if(track.length<2) return toast("هنوز مسیری ثبت نشده است");
+  downloadText("track-"+new Date().toISOString().slice(0,10)+".gpx",gpxDoc("",gpxTrk()),"application/gpx+xml");
+});
+$("trackClear").addEventListener("click",()=>{
+  if(!track.length) return toast("مسیری برای پاک کردن نیست");
+  if(!confirm("مسیر ثبت‌شده پاک شود؟")) return;
+  track=[]; persistTrack(); drawTrack(); updateTrackInfo();
+});
+$("anchorBtn").addEventListener("click",toggleAnchor);
+$("spotHere").addEventListener("click",async()=>{
+  try{
+    const p=await requestMyLocation(true);
+    saveSpotAt(p.lat,p.lon);
+  }catch(e){ toast(geoMsg(e).slice(0,80)); }
+});
+$("spotCenter").addEventListener("click",()=>{ const c=map.getCenter(); saveSpotAt(c.lat,c.lng); });
+$("spotJson").addEventListener("click",()=>{
+  if(!spots.length) return toast("نقطه‌ای برای خروجی نیست");
+  downloadText("spots.json",JSON.stringify(spots,null,2),"application/json");
+});
+$("spotGpx").addEventListener("click",()=>{
+  if(!spots.length) return toast("نقطه‌ای برای خروجی نیست");
+  downloadText("spots.gpx",gpxDoc(gpxWpts(spots),""),"application/gpx+xml");
+});
+$("spotImport").addEventListener("click",()=>$("spotFile").click());
+$("spotFile").addEventListener("change",e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const arr=JSON.parse(r.result);
+      if(!Array.isArray(arr)) throw 0;
+      let n=0;
+      arr.forEach((x,i)=>{
+        const lat=Number(x&&x.lat), lon=Number(x&&x.lon);
+        if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180) return;
+        const name=String((x&&x.name)||"نقطه").slice(0,60);
+        if(spots.some(s=>s.lat===lat&&s.lon===lon&&s.name===name)) return;
+        spots.push({id:Date.now()+i+Math.floor(Math.random()*1000),name,lat,lon,mob:!!(x&&x.mob),t:Date.now()});
+        n++;
+      });
+      persistSpots(); renderSpots();
+      toast(n?fa(n)+" نقطه وارد شد":"نقطه‌ی تازه‌ای پیدا نشد");
+    }catch(_){ toast("فایل معتبر نیست"); }
+    e.target.value="";
+  };
+  r.readAsText(f);
+});
+$("sunMoonBtn").addEventListener("click",()=>{ const c=map.getCenter(); closePanel(); showSunMoonAt(c.lat,c.lng); });
+$("seaBtn").addEventListener("click",()=>{ const c=map.getCenter(); closePanel(); showSeaAt(c.lat,c.lng); });
+$("mobBtn").addEventListener("click",mobPress);
+
+map.on("contextmenu",e=>{
+  if(routePickMode||measureOn) return;
+  showSpotMenu(e.latlng);
+});
+
+renderSpots();
+drawTrack();
+updateTrackInfo();
+
+
+/* ---------- حالت آفلاین کامل (sw.js) ---------- */
+(function(){
+  const e=$("swStatus");
+  if(!e) return;
+  if(!("serviceWorker" in navigator)){
+    e.textContent="ℹ️ مرورگر شما از حالت آفلاین کامل پشتیبانی نمی‌کند.";
+    return;
+  }
+  if(!/^https?:$/.test(location.protocol)){
+    (function(){
+      let ok=false;
+      try{ ok=!!localStorage.getItem("marine_leaflet_js"); }catch(_){}
+      e.textContent=ok
+        ?"📦 فایل محلی: Leaflet روی گوشی ذخیره است ✓ (نقشه‌ی ذخیره‌شده، مسیریابی، نقاط صید و ماه آفلاین کار می‌کنند)"
+        :"📦 فایل محلی: یک بار با اینترنت باز کنید تا Leaflet روی گوشی ذخیره شود.";
+    })();
+    return;
+  }
+  const ask=()=>{
+    const c=navigator.serviceWorker.controller;
+    if(c) c.postMessage({type:"stats"});
+  };
+  navigator.serviceWorker.addEventListener("message",ev=>{
+    const d=ev.data||{};
+    if(d.type==="stats") e.textContent="📴 آفلاین فعال · "+fa(d.tiles)+" کاشی نقشه و "+fa(d.tides)+" جزر و مد ذخیره‌شده";
+  });
+  navigator.serviceWorker.addEventListener("controllerchange",ask);
+  navigator.serviceWorker.register("sw.js")
+    .then(()=>navigator.serviceWorker.ready)
+    .then(()=>{ e.textContent="📴 حالت آفلاین فعال شد"; ask(); })
+    .catch(()=>{ e.textContent="ℹ️ فایل sw.js کنار صفحه پیدا نشد؛ حالت آفلاین کامل غیرفعال است."; });
+  setInterval(ask,20000);
+})();
+
+/* ---------- ذخیره‌ی ماندگار جزر و مد (برای حالت بدون اینترنت) ---------- */
+async function tideFetchJson(url,key){
+  const LK="marine_tide_cache";
+  let store={};
+  try{ store=JSON.parse(localStorage.getItem(LK)||"{}"); }catch(_){ store={}; }
+  try{
+    const r=await fetch(url);
+    if(!r.ok) throw 0;
+    const j=await r.json();
+    const ca=r.headers.get("X-SW-Age");
+    if(ca!=null){ j.cachedAge=Number(ca); return j; }
+    store[key]={t:Date.now(),d:j};
+    Object.keys(store).sort((a,b)=>store[b].t-store[a].t).slice(24).forEach(k=>delete store[k]);
+    try{ localStorage.setItem(LK,JSON.stringify(store)); }catch(_){}
+    return j;
+  }catch(e){
+    const x=store[key];
+    if(x&&(Date.now()-x.t)/3600e3<=168){
+      x.d.cachedAge=(Date.now()-x.t)/3600e3;
+      return x.d;
+    }
+    throw e;
+  }
+}
+
+/* ---------- ساعت کوچک جزر و مد ---------- */
+let tideOffMs=null;
+setInterval(()=>{
+  const sh=$("tideSheet"), c=$("tideClock");
+  if(!sh||!c||!sh.classList.contains("open")) return;
+  const off=tideOffMs==null?-new Date().getTimezoneOffset()*60000:tideOffMs;
+  c.textContent=faDigits(new Date(Date.now()+off).toISOString().slice(11,19));
+},1000);
+
+/* =========================
+   INITIAL ROUTING DATA
+========================= */
+
+updateRouteDestinationList();
+updateRouteShipList();
+
+/* =========================
+   START
+========================= */
+
+setTimeout(connectAIS,500);
+window.addEventListener("online",()=>{toast("اینترنت وصل شد");reconnect();loadAISSnapshot();});
+window.addEventListener("offline",()=>{toast("اینترنت قطع شد؛ حالت آفلاین");setStatus("آفلاین؛ AIS غیرفعال","error");});
+
+// HTTP snapshot fallback: اگر WebSocket در شبکه/مرورگر بسته باشد،
+// آخرین موقعیت‌های واقعی Open Waters را هم می‌گیریم. هیچ دادهٔ ساختگی استفاده نمی‌شود.
+async function loadAISSnapshot(){
+  if(!navigator.onLine) return 0;
+  try{
+    const r=await fetch(AIS_SNAPSHOT_URL,{cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const fc=await r.json();
+    const list=Array.isArray(fc?.features)?fc.features:[];
+    let n=0;
+    for(const f of list){
+      const c=f?.geometry?.coordinates;
+      const p=f?.properties||{};
+      if(!Array.isArray(c)||c.length<2) continue;
+      const s={
+        mmsi:String(p.mmsi||f.id||""),
+        name:String(p.name||"کشتی بدون نام").trim()||"کشتی بدون نام",
+        lat:Number(c[1]), lon:Number(c[0]),
+        sog:Number.isFinite(Number(p.sog))?Number(p.sog):NaN,
+        cog:Number.isFinite(Number(p.cog))?Number(p.cog):NaN,
+        heading:Number.isFinite(Number(p.heading))?Number(p.heading):NaN,
+        type:category(p.type??0),
+        kind:String(p.kind||"vessel"),
+        source:p.source||"", station:p.station||"",
+        age_s:NaN, msg_type:p.msg_type||""
+      };
+      if(!s.mmsi||!Number.isFinite(s.lat)||!Number.isFinite(s.lon)) continue;
+      upsert(s); n++;
+    }
+    if(n){
+      gotReal=true;
+      stopDemo();
+      setStatus("AIS زنده · "+n+" هدف","online");
+    }
+    return n;
+  }catch(e){
+    console.warn("AIS snapshot failed",e);
+    return 0;
+  }
+}
+
+setTimeout(loadAISSnapshot,1500);
+setInterval(loadAISSnapshot,30000);
+
+/* =========================
+   INITIAL SIZE
+========================= */
+
+setTimeout(
+  ()=>{
+    map.invalidateSize(true);
+    dlInfo();
+  },
+  700
+);
+
+</script>
+
+</body>
+</html>
